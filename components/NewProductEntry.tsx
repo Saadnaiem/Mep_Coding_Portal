@@ -1,0 +1,281 @@
+
+import React, { useState, useMemo, useCallback } from 'react';
+import { Layers, Plus } from 'lucide-react';
+import { Card, Input, Select, Button } from './UI'; // Assuming UI.tsx is in the same folder
+import { PRODUCT_HIERARCHY } from '../services/mockDb';
+import { Product } from '../types';
+
+interface NewProductEntryProps {
+  onAddProduct: (product: Product) => void;
+  defaultDivision?: string;
+}
+
+export const NewProductEntry: React.FC<NewProductEntryProps> = ({ onAddProduct, defaultDivision }) => {
+  const [productForm, setProductForm] = useState({
+    brand: '',
+    name: '',
+    name_ar: '',
+    barcode: '',
+    manufacturer: '',
+    origin: '',
+    storage: '',
+    pack_size: '',
+    division: defaultDivision || '',
+    department: '',
+    category: '',
+    sub_category: '',
+    class_name: '',
+    uom: '',
+    cost: '',
+    retail: '',
+    
+    // Extended MEP Fields
+    item_group: '',
+    item_sub_group: '',
+    purchasing_status: 'New',
+    moh_discount_percentage: '',
+    invoice_extra_discount: '',
+    site_no: '',
+    site_name: '',
+    vendor_no: '',
+    vendor_name: '',
+    case_count: '',
+    inner_pack_size: '',
+    lot_indicator: 'No',
+    primary_warehouse: '',
+    vendor_system_code: '',
+    lead_time: '',
+    min_order_qty: '',
+    rtv_allowed: 'No',
+    category_manager: '',
+    buyer: '',
+    currency: 'SAR',
+    taxable: 'No',
+    erp_item_code: ''
+  });
+
+  // Cascade Logic
+  const divisions = useMemo(() => PRODUCT_HIERARCHY.map(d => d.name).filter(n => n !== "Grand Total"), []);
+  
+  const departments = useMemo(() => {
+    const div = PRODUCT_HIERARCHY.find(d => d.name === productForm.division);
+    return div?.children?.map(d => d.name) || [];
+  }, [productForm.division]);
+
+  const categories = useMemo(() => {
+    const div = PRODUCT_HIERARCHY.find(d => d.name === productForm.division);
+    const dept = div?.children?.find(d => d.name === productForm.department);
+    return dept?.children?.map(c => c.name) || [];
+  }, [productForm.division, productForm.department]);
+
+  const subCategories = useMemo(() => {
+    const div = PRODUCT_HIERARCHY.find(d => d.name === productForm.division);
+    const dept = div?.children?.find(d => d.name === productForm.department);
+    const cat = dept?.children?.find(c => c.name === productForm.category);
+    return cat?.children?.map(s => s.name) || [];
+  }, [productForm.division, productForm.department, productForm.category]);
+
+  const classes = useMemo(() => {
+    const div = PRODUCT_HIERARCHY.find(d => d.name === productForm.division);
+    const dept = div?.children?.find(d => d.name === productForm.department);
+    const cat = dept?.children?.find(c => c.name === productForm.category);
+    const sub = cat?.children?.find(s => s.name === productForm.sub_category);
+    return sub?.children?.map(cl => cl.name) || [];
+  }, [productForm.division, productForm.department, productForm.category, productForm.sub_category]);
+
+  const handleFieldChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+      const { name, value } = e.target;
+      setProductForm(prev => ({ ...prev, [name]: value }));
+  }, []);
+
+  const handleHierarchyChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
+      const { name, value } = e.target;
+      setProductForm(prev => {
+          const next = { ...prev, [name]: value };
+          if (name === 'division') { next.department = ''; next.category = ''; next.sub_category = ''; next.class_name = ''; }
+          if (name === 'department') { next.category = ''; next.sub_category = ''; next.class_name = ''; }
+          if (name === 'category') { next.sub_category = ''; next.class_name = ''; }
+          if (name === 'sub_category') { next.class_name = ''; }
+          return next;
+      });
+  }, []);
+
+  const handleAddToManifest = () => {
+    // Define optional fields to exclude from validation
+    const optionalFields = ['item_group', 'item_sub_group', 'erp_item_code', 'category_manager', 'buyer', 'invoice_extra_discount', 'vendor_no', 'primary_warehouse', 'vendor_name'];
+    
+    // Validate all other fields
+    const missingFields = Object.keys(productForm)
+      .filter(key => !optionalFields.includes(key))
+      .filter(key => {
+        const val = productForm[key as keyof typeof productForm];
+        return val === '' || val === null || val === undefined;
+      });
+
+    if (missingFields.length > 0) {
+      alert(`Please fill in the following mandatory fields: ${missingFields.map(f => f.replace(/_/g, ' ')).join(', ')}`);
+      return;
+    }
+    
+    const newProduct: Product = {
+      id: `p-${Date.now()}`,
+      request_id: 'pending',
+      brand: productForm.brand,
+      product_name: productForm.name,
+      product_name_ar: productForm.name_ar,
+      item_description: `${productForm.name} - ${productForm.brand}`,
+      barcode: productForm.barcode,
+      manufacturer: productForm.manufacturer,
+      country_of_origin: productForm.origin,
+      storage_condition: productForm.storage,
+      pack_size: productForm.pack_size,
+      division: productForm.division,
+      department: productForm.department,
+      category: productForm.category,
+      sub_category: productForm.sub_category,
+      class_name: productForm.class_name,
+      uom: productForm.uom,
+      price_cost: parseFloat(productForm.cost) || 0,
+      price_retail: parseFloat(productForm.retail) || 0,
+      
+      // MEP Mappings
+      purchasing_status: productForm.purchasing_status,
+      moh_discount_percentage: parseFloat(productForm.moh_discount_percentage) || 0,
+      invoice_extra_discount: parseFloat(productForm.invoice_extra_discount) || 0,
+      site_no: productForm.site_no,
+      site_name: productForm.site_name,
+      vendor_no: productForm.vendor_no,
+      vendor_name: productForm.vendor_name,
+      case_count: parseInt(productForm.case_count) || 0,
+      inner_pack_size: productForm.inner_pack_size,
+      lot_indicator: productForm.lot_indicator === 'Yes',
+      primary_warehouse: productForm.primary_warehouse,
+      vendor_system_code: productForm.vendor_system_code,
+      lead_time: productForm.lead_time,
+      min_order_qty: parseInt(productForm.min_order_qty) || 0,
+      rtv_allowed: productForm.rtv_allowed === 'Yes',
+      category_manager: productForm.category_manager,
+      buyer: productForm.buyer,
+      currency: productForm.currency,
+      taxable: productForm.taxable === 'Yes',
+      erp_item_code: productForm.erp_item_code,
+      item_group: productForm.item_group,
+      item_sub_group: productForm.item_sub_group,
+      margin: (productForm.cost && productForm.retail && parseFloat(productForm.retail) > 0) 
+            ? parseFloat(((1 - (parseFloat(productForm.cost) / parseFloat(productForm.retail))) * 100).toFixed(2)) 
+            : 0
+    };
+
+    onAddProduct(newProduct);
+
+    // Reset Form (keep hierarchy and some fields?)
+    setProductForm({ 
+        ...productForm, 
+        name: '', 
+        name_ar: '', 
+        barcode: '', 
+        cost: '', 
+        retail: '', 
+        // Resetting others to avoid sticking values
+        manufacturer: '',
+        pack_size: '',
+        vendor_system_code: '' 
+    });
+  };
+
+  return (
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 zoom-in-95 duration-500">
+        <Card title="Cascading Hierarchy Selection" className="border-t-4 border-t-[#0F3D3E]">
+             <div className="grid grid-cols-1 md:grid-cols-5 gap-4 p-4 bg-[#F0F4F4] rounded-2xl border border-gray-100 shadow-inner">
+               <Select label="Division" name="division" options={divisions} value={productForm.division} onChange={handleHierarchyChange} />
+               <Select label="Department" name="department" options={departments} value={productForm.department} onChange={handleHierarchyChange} disabled={!productForm.division} />
+               <Select label="Category" name="category" options={categories} value={productForm.category} onChange={handleHierarchyChange} disabled={!productForm.department} />
+               <Select label="Sub-Category" name="sub_category" options={subCategories} value={productForm.sub_category} onChange={handleHierarchyChange} disabled={!productForm.category} />
+               <Select label="Class" name="class_name" options={classes} value={productForm.class_name} onChange={handleHierarchyChange} disabled={!productForm.sub_category} />
+             </div>
+        </Card>
+
+        <Card title="Pharmacy Listing Specifications" className="border-t-4 border-t-[#C5A065]">
+             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="space-y-6">
+                  <h4 className="font-serif font-bold text-[#0F3D3E] text-sm uppercase tracking-widest mb-4 border-b border-[#C5A065]/30 pb-2">Basic Information</h4>
+                  <Input label="Brand Name (English)" name="brand" placeholder="e.g. Panadol" value={productForm.brand} onChange={handleFieldChange} />
+                  <Input label="English Description" name="name" placeholder="e.g. Panadol Advance 500mg" value={productForm.name} onChange={handleFieldChange} />
+                  <Input label="Arabic Description" name="name_ar" placeholder="باندول ادفانس ٥٠٠ ملجم" value={productForm.name_ar} onChange={handleFieldChange} />
+                  <Input label="GTIN / Barcode / IBC/UBC" name="barcode" placeholder="628XXXXXXXXXX" value={productForm.barcode} onChange={handleFieldChange} />
+                  <Input label="Manufacturer" name="manufacturer" placeholder="GSK Ltd." value={productForm.manufacturer} onChange={handleFieldChange} />
+                  <Input label="Country of Origin" name="origin" placeholder="Ireland" value={productForm.origin} onChange={handleFieldChange} />
+                  <div className="grid grid-cols-2 gap-4">
+                     <Input label="Vendor System Code" name="vendor_system_code" placeholder="Required" value={productForm.vendor_system_code} onChange={handleFieldChange} />
+                     <Input label="Item Code (Optional)" name="erp_item_code" placeholder="Optional" value={productForm.erp_item_code} onChange={handleFieldChange} />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <Input label="Item Group (Optional)" name="item_group" placeholder="e.g. Pharma" value={productForm.item_group} onChange={handleFieldChange} />
+                    <Input label="Item sub_Group" name="item_sub_group" placeholder="e.g. Sub Group" value={productForm.item_sub_group} onChange={handleFieldChange} />
+                  </div>
+                </div>
+                
+                <div className="space-y-6">
+                  <h4 className="font-serif font-bold text-[#0F3D3E] text-sm uppercase tracking-widest mb-4 border-b border-[#C5A065]/30 pb-2">Logistics & Supply</h4>
+                  <Select label="Purchasing Status" name="purchasing_status" options={['In-Stock', 'Cross Docking', 'DSD']} value={productForm.purchasing_status} onChange={handleFieldChange} />
+                  <Select label="Storage / Handling Temp" name="storage" options={['Room Temp (15-25C)', 'Chilled (2-8C)', 'Frozen (-18C)']} value={productForm.storage} onChange={handleFieldChange} />
+                  <div className="grid grid-cols-2 gap-4">
+                     <Input label="Pack Size" name="pack_size" placeholder="24 Tablets / Box" value={productForm.pack_size} onChange={handleFieldChange} />
+                     <Select label="UoM" name="uom" options={['Each', 'Box', 'Carton', 'Bottle']} value={productForm.uom} onChange={handleFieldChange} />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                     <Select label="Lot Indicator" name="lot_indicator" options={['Yes', 'No']} value={productForm.lot_indicator} onChange={handleFieldChange} />
+                     <Select label="RTV Allowed" name="rtv_allowed" options={['Yes', 'No']} value={productForm.rtv_allowed} onChange={handleFieldChange} />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                     <Input label="Case Count" name="case_count" type="number" value={productForm.case_count} onChange={handleFieldChange} />
+                     <Input label="Inner Pack Size" name="inner_pack_size" value={productForm.inner_pack_size} onChange={handleFieldChange} />
+                  </div>
+                  <Input label="Primary Warehouse (Optional)" name="primary_warehouse" placeholder="e.g. Riyadh Central" value={productForm.primary_warehouse} onChange={handleFieldChange} />
+                  <Input label="Lead Time (Days)" name="lead_time" placeholder="e.g. 7 Days" value={productForm.lead_time} onChange={handleFieldChange} />
+                </div>
+
+                <div className="space-y-6">
+                  <h4 className="font-serif font-bold text-[#0F3D3E] text-sm uppercase tracking-widest mb-4 border-b border-[#C5A065]/30 pb-2">Commercial Terms</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <Input label="Vendor Price (Cost)" name="cost" type="number" value={productForm.cost} onChange={handleFieldChange} />
+                    <Input label="Sales Price" name="retail" type="number" value={productForm.retail} onChange={handleFieldChange} />
+                  </div>
+                  <div className="bg-[#F0F4F4] p-4 rounded-xl border border-gray-100 mb-2">
+                     <p className="text-[9px] font-black text-[#C5A065] uppercase tracking-widest mb-1">Estimated Margin</p>
+                     <p className="text-2xl font-black text-[#0F3D3E]">
+                        {productForm.cost && productForm.retail && parseFloat(productForm.retail) > 0
+                           ? `${((1 - (parseFloat(productForm.cost) / parseFloat(productForm.retail))) * 100).toFixed(2)}%`
+                           : '-'}
+                     </p>
+                  </div>
+                  <Select label="Currency" name="currency" options={['SAR', 'USD', 'EUR']} value={productForm.currency} onChange={handleFieldChange} />
+                  <div className="grid grid-cols-2 gap-4">
+                     <Input label="MOH Disc %" name="moh_discount_percentage" type="number" value={productForm.moh_discount_percentage} onChange={handleFieldChange} />
+                     <Input label="Invoice Extra Disc (Optional)" name="invoice_extra_discount" type="number" value={productForm.invoice_extra_discount} onChange={handleFieldChange} />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <Select label="Taxable" name="taxable" options={['Yes', 'No']} value={productForm.taxable} onChange={handleFieldChange} />
+                    <Input label="Minimum Order Qty" name="min_order_qty" type="number" value={productForm.min_order_qty} onChange={handleFieldChange} />
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                     <Input label="Site Name" name="site_name" placeholder="e.g. Dammam" value={productForm.site_name} onChange={handleFieldChange} />
+                     <Input label="Site No" name="site_no" placeholder="e.g. 102" value={productForm.site_no} onChange={handleFieldChange} />
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-100">
+                     <Input label="Vendor No (Optional)" name="vendor_no" placeholder="e.g. 120034" value={productForm.vendor_no} onChange={handleFieldChange} />
+                     <Input label="Category Manager (Optional)" name="category_manager" placeholder="Name" value={productForm.category_manager} onChange={handleFieldChange} />
+                  </div>
+                  <div className="pt-4">
+                     <Input label="Buyer (Optional)" name="buyer" placeholder="Name" value={productForm.buyer} onChange={handleFieldChange} />
+                  </div>
+
+                  <div className="pt-6"><Button className="w-full h-14 rounded-xl font-bold uppercase tracking-widest bg-[#0F3D3E] hover:bg-[#C5A065] text-white shadow-xl transition-all duration-300" onClick={handleAddToManifest}>Add Product to Manifest <Plus size={20} /></Button></div>
+                </div>
+             </div>
+        </Card>
+    </div>
+  );
+};

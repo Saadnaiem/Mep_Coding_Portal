@@ -1,0 +1,7 @@
+{
+  "name": "Product Onboarding Portal (POP) – AlHabib",
+  "description": "An enterprise-grade vendor and product registration system for Al Habib Pharmacy, featuring a 7-step approval workflow, SLA tracking, and secure document management.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
