@@ -1577,19 +1577,37 @@ const App: React.FC = () => {
             }
         }
 
-        // 2. Footer (Timestamp & Page Number)
+        // 2. Footer (Enhanced)
         const footerY = pageHeight - 10;
-        doc.setFont("helvetica", "normal");
+        
+        // Decorative Line
+        doc.setDrawColor(197, 160, 101); // Gold
+        doc.setLineWidth(0.5);
+        doc.line(15, footerY - 5, pageWidth - 15, footerY - 5);
+
+        // Left: Branding
+        doc.setFont("helvetica", "bold");
         doc.setFontSize(8);
+        doc.setTextColor(15, 61, 62); // Teal
+        doc.text("MEP CODING PORTAL", 15, footerY);
+        
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(120);
+        doc.text(" | Al Habib Pharmacy", 15 + doc.getTextWidth("MEP CODING PORTAL"), footerY);
+
+        // Center: Timestamp
+        doc.setFontSize(7);
         doc.setTextColor(150);
-        
-        // Left: Timestamp
-        doc.text(`Generated: ${timestamp}`, 14, footerY);
-        
+        const timeText = `Generated: ${timestamp}`;
+        const timeW = doc.getTextWidth(timeText);
+        doc.text(timeText, (pageWidth - timeW) / 2, footerY);
+
         // Right: Page Number
+        doc.setFontSize(8);
+        doc.setTextColor(100);
         const pageText = `Page ${i} of ${totalPages}`;
-        const textWidth = doc.getTextWidth(pageText);
-        doc.text(pageText, pageWidth - 14 - textWidth, footerY);
+        const pageW = doc.getTextWidth(pageText);
+        doc.text(pageText, pageWidth - 15 - pageW, footerY);
     }
 
     doc.save(`Request_${currentRequest.request_number}_Report.pdf`);
