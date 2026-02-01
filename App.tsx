@@ -998,15 +998,19 @@ const App: React.FC = () => {
     // --- PAGE 2: APPROVAL SEQUENCE & HISTORY ---
     doc.addPage();
     
-    // Header with line
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(16);
-    doc.setTextColor(15, 61, 62);
-    doc.text("Approval Sequence & History", 14, 20);
+    // Modern Header Bar
+    doc.setFillColor(15, 61, 62); // Teal
+    doc.rect(0, 15, pageWidth, 14, 'F');
     
-    doc.setDrawColor(197, 160, 101); // Gold Line
-    doc.setLineWidth(0.5);
-    doc.line(14, 23, pageWidth - 14, 23);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(14);
+    doc.setTextColor(255, 255, 255); // White
+    doc.text("APPROVAL SEQUENCE & HISTORY", 15, 24);
+    
+    // Gold Accent Line under header
+    doc.setDrawColor(197, 160, 101); 
+    doc.setLineWidth(0.8);
+    doc.line(0, 29, pageWidth, 29);
     
     // Build Comprehensive History
     const sortedActions = [...requestActions].sort((a,b) => new Date(a.action_at).getTime() - new Date(b.action_at).getTime());
@@ -1173,28 +1177,42 @@ const App: React.FC = () => {
 
         // --- Descriptions Block (Full Width) ---
         // English Description
-        doc.setFillColor(250, 250, 250);
-        doc.rect(15, yPos, pageWidth - 30, 25, 'F'); // Background box
-        
-        doc.setFontSize(6);
-        doc.setTextColor(100);
+        // Header
+        doc.setFillColor(15, 61, 62); // Teal
+        doc.rect(15, yPos, pageWidth - 30, 6, 'F');
+        doc.setFontSize(7);
+        doc.setTextColor(255, 255, 255);
         doc.setFont("helvetica", "bold");
         doc.text("FULL PRODUCT DESCRIPTION (ENGLISH)", 17, yPos + 4);
-        
+
+        // Body
+        doc.setFillColor(248, 250, 250);
+        doc.rect(15, yPos + 6, pageWidth - 30, 20, 'F'); // Content box
+        doc.setDrawColor(220, 220, 220);
+        doc.rect(15, yPos + 6, pageWidth - 30, 20, 'S'); // Border
+
         doc.setFontSize(9);
         doc.setTextColor(15, 61, 62);
         doc.setFont("helvetica", "normal");
         const descEn = doc.splitTextToSize(String(p.item_description || p.product_name || '-'), pageWidth - 34);
-        doc.text(descEn, 17, yPos + 9);
+        doc.text(descEn, 17, yPos + 11);
         
-        yPos += 14; 
+        yPos += 28; // Increased spacing
 
         // Arabic Description
-        doc.setFontSize(6);
-        doc.setTextColor(100, 100, 100);
+        // Header
+        doc.setFillColor(15, 61, 62); 
+        doc.rect(15, yPos, pageWidth - 30, 6, 'F');
+        doc.setFontSize(7);
+        doc.setTextColor(255, 255, 255);
         doc.setFont("helvetica", "bold");
         doc.text("ARABIC DESCRIPTION", 17, yPos + 4);
         
+        // Body
+        doc.setFillColor(248, 250, 250);
+        doc.rect(15, yPos + 6, pageWidth - 30, 20, 'F');
+        doc.rect(15, yPos + 6, pageWidth - 30, 20, 'S');
+
         doc.setFontSize(9);
         doc.setTextColor(15, 61, 62);
 
@@ -1204,29 +1222,26 @@ const App: React.FC = () => {
         
         if(isArabicFontAdded) {
             doc.setFont("Amiri", "normal");
-            // For Arabic, align: 'right' works best if we render line by line or let jsPDF handle it.
-            // Using maxWidth in doc.text is often safer than splitTextToSize for complex scripts
             try {
                 const arText = String(p.product_name_ar || '-');
-                // Align right at 195mm. 'maxWidth' handles wrapping.
-                doc.text(arText, pageWidth - 15, yPos + 9, { 
+                doc.text(arText, pageWidth - 19, yPos + 11, { 
                     align: 'right', 
-                    maxWidth: safeWidth
+                    maxWidth: safeWidth - 8
                 });
             } catch (err) {
                 // Fallback if formatting fails
-                doc.text(String(p.product_name_ar || '-'), pageWidth - 15, yPos + 9, { align: 'right' });
+                doc.text(String(p.product_name_ar || '-'), pageWidth - 19, yPos + 11, { align: 'right' });
             }
         } else {
              doc.setFont("helvetica", "normal"); 
-             const descAr = doc.splitTextToSize(String(p.product_name_ar || '-'), safeWidth);
-             doc.text(descAr, pageWidth - 15, yPos + 9, { align: 'right' }); 
+             const descAr = doc.splitTextToSize(String(p.product_name_ar || '-'), safeWidth - 8);
+             doc.text(descAr, pageWidth - 19, yPos + 11, { align: 'right' }); 
         }
         
         // Reset Font
         doc.setFont("helvetica", "normal");
 
-        yPos += 16; 
+        yPos += 30; 
 
 
         // --- Specs Section ---
@@ -1363,10 +1378,19 @@ const App: React.FC = () => {
         */
 
         // Title
+        // Teal Header Bar
+        doc.setFillColor(15, 61, 62); 
+        doc.rect(0, nY, pageWidth, 14, 'F');
+        
         doc.setFont("helvetica", "bold");
         doc.setFontSize(14);
-        doc.setTextColor(15, 61, 62);
-        doc.text("NEW VENDOR REGISTRATION FORM", 15, nY + 10);
+        doc.setTextColor(255, 255, 255);
+        doc.text("NEW VENDOR REGISTRATION FORM", 15, nY + 9);
+        
+        // Gold Accent
+        doc.setDrawColor(197, 160, 101);
+        doc.setLineWidth(0.8);
+        doc.line(0, nY + 14, pageWidth, nY + 14);
         
         nY += 25;
 
@@ -1460,20 +1484,27 @@ const App: React.FC = () => {
     // --- APPROVAL SEQUENCE & HISTORY PAGE ---
     doc.addPage();
     const hPageW = doc.internal.pageSize.width;
-    let hY = 25;
+    let hY = 40; // Start content below header
 
-    // Header
+    // Header Bar
+    doc.setFillColor(15, 61, 62); 
+    doc.rect(0, 15, hPageW, 14, 'F');
+    
     doc.setFont("helvetica", "bold");
     doc.setFontSize(14);
-    doc.setTextColor(15, 61, 62);
-    doc.text("APPROVAL SEQUENCE & HISTORY", 15, hY);
-    hY += 15;
+    doc.setTextColor(255, 255, 255);
+    doc.text("APPROVAL SEQUENCE & HISTORY", 15, 24);
+    
+    doc.setDrawColor(197, 160, 101); // Gold
+    doc.setLineWidth(0.8);
+    doc.line(0, 29, hPageW, 29);
 
     // Table Header
-    doc.setFillColor(245, 245, 245);
+    doc.setFillColor(240, 244, 244); // Light Teal
     doc.rect(15, hY, hPageW - 30, 10, 'F');
     doc.setFontSize(9);
-    doc.setTextColor(0);
+    doc.setTextColor(15, 61, 62); // Teal Text
+    doc.setFont("helvetica", "bold");
     doc.text("ACTION / STEP", 20, hY + 6.5);
     doc.text("PERFORMED BY", 80, hY + 6.5);
     doc.text("TIMESTAMP", 140, hY + 6.5);
