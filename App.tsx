@@ -1850,8 +1850,8 @@ const App: React.FC = () => {
         </div>
       </div>
       <Card title="Onboarding Progress" noPadding className="border-t-4 border-t-[#C5A065]">
-        <div className="p-12"><Stepper currentStep={currentRequest?.current_step || 1} totalSteps={MOCK_STEPS.length} labels={MOCK_STEPS.map(s => s.step_name)} /></div>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 p-10 bg-[#f8f9fa] border-t border-gray-100">
+        <div className="p-4 md:p-12 overflow-x-auto"><Stepper currentStep={currentRequest?.current_step || 1} totalSteps={MOCK_STEPS.length} labels={MOCK_STEPS.map(s => s.step_name)} /></div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 p-6 md:p-10 bg-[#f8f9fa] border-t border-gray-100">
           <div className="space-y-6">
             <Card title="Product Listing Details" className="bg-white shadow-sm border border-gray-100">
                <div className="space-y-6">

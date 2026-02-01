@@ -106,27 +106,34 @@ export const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: stri
 };
 
 export const Stepper: React.FC<{ currentStep: number; totalSteps: number; labels: string[] }> = ({ currentStep, totalSteps, labels }) => (
-  <div className="relative flex justify-between items-center w-full px-4 py-8">
-    <div className="absolute top-1/2 left-8 right-8 h-0.5 bg-gray-100 -translate-y-1/2 z-0" />
-    {Array.from({ length: totalSteps }).map((_, i) => {
-      const stepNum = i + 1;
-      const isActive = stepNum === currentStep;
-      const isCompleted = stepNum < currentStep;
-      
-      return (
-        <div key={i} className="relative z-10 flex flex-col items-center flex-1">
-          <div className={`w-12 h-12 rounded-full flex items-center justify-center border-[3px] transition-all duration-500 bg-white ${
-            isActive ? 'border-[#C5A065] text-[#0F3D3E] shadow-xl shadow-[#C5A065]/20 scale-110' : 
-            isCompleted ? 'border-[#0F3D3E] bg-[#0F3D3E] text-[#C5A065]' : 
-            'border-gray-100 text-gray-300'
-          }`}>
-            {isCompleted ? <Check className="w-5 h-5" /> : <span className="text-sm font-serif font-bold">{stepNum}</span>}
+  <div className="w-full overflow-x-auto pb-4 hide-scrollbar">
+    <div className="relative flex justify-between items-center min-w-[300px] md:min-w-full px-2 md:px-4 py-8 md:py-8">
+      <div className="absolute top-1/2 left-4 right-4 md:left-8 md:right-8 h-0.5 bg-gray-100 -translate-y-1/2 z-0" />
+      {Array.from({ length: totalSteps }).map((_, i) => {
+        const stepNum = i + 1;
+        const isActive = stepNum === currentStep;
+        const isCompleted = stepNum < currentStep;
+        // On mobile, only show label if active or first/last to save space
+        // OR better: use a staggered display or simple scroll
+        
+        return (
+          <div key={i} className="relative z-10 flex flex-col items-center flex-1 min-w-[40px] md:min-w-auto">
+            <div className={`w-8 h-8 md:w-12 md:h-12 rounded-full flex items-center justify-center border-2 md:border-[3px] transition-all duration-500 bg-white ${
+              isActive ? 'border-[#C5A065] text-[#0F3D3E] shadow-xl shadow-[#C5A065]/20 scale-110' : 
+              isCompleted ? 'border-[#0F3D3E] bg-[#0F3D3E] text-[#C5A065]' : 
+              'border-gray-100 text-gray-300'
+            }`}>
+              {isCompleted ? <Check className="w-3 h-3 md:w-5 md:h-5" /> : <span className="text-xs md:text-sm font-serif font-bold">{stepNum}</span>}
+            </div>
+            {/* Logic to hide labels on mobile to prevent overlap, show only active step label on mobile */}
+            <span className={`absolute top-10 md:top-14 w-20 md:w-32 left-1/2 -translate-x-1/2 text-center text-[7px] md:text-[9px] font-serif font-bold uppercase tracking-wider leading-tight 
+                ${isActive ? 'opacity-100 z-20 text-[#C5A065]' : isCompleted ? 'hidden md:opacity-100 md:block text-[#0F3D3E]' : 'hidden md:opacity-100 md:block text-gray-300'}
+            `}>
+              {labels[i]}
+            </span>
           </div>
-          <span className={`absolute top-14 w-32 left-1/2 -translate-x-1/2 text-center text-[9px] font-serif font-bold uppercase tracking-wider leading-tight ${isActive ? 'text-[#C5A065]' : isCompleted ? 'text-[#0F3D3E]' : 'text-gray-300'}`}>
-            {labels[i]}
-          </span>
-        </div>
-      );
-    })}
+        );
+      })}
+    </div>
   </div>
 );
