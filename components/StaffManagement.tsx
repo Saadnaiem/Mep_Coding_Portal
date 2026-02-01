@@ -73,12 +73,12 @@ export const StaffManagement = () => {
 
   return (
     <div className="space-y-10 animate-in fade-in duration-700">
-      <div className="flex justify-between items-center border-b border-gray-100 pb-6">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-gray-100 pb-6 gap-4">
         <div>
-          <h2 className="text-4xl font-serif font-black text-[#0F3D3E] tracking-tight mb-2">Access Management</h2>
+          <h2 className="text-3xl md:text-4xl font-serif font-black text-[#0F3D3E] tracking-tight mb-2">Access Management</h2>
           <p className="text-[#C5A065] text-sm font-bold tracking-wide">Manage internal users and role assignments</p>
         </div>
-        <Button variant="outline" onClick={loadEmployees} className="!py-2 !px-4">
+        <Button variant="outline" onClick={loadEmployees} className="w-full md:w-auto !py-2 !px-4">
              <RotateCw size={14} className={loading ? "animate-spin" : ""} /> Refresh List
         </Button>
       </div>

@@ -25,12 +25,12 @@ export const Button: React.FC<React.ButtonHTMLAttributes<HTMLButtonElement> & { 
 export const Card: React.FC<{ title?: string; children: React.ReactNode; className?: string; noPadding?: boolean }> = ({ title, children, className = '', noPadding = false }) => (
   <div className={`bg-white rounded-xl shadow-2xl shadow-gray-200/50 border border-gray-100 overflow-hidden ${className}`}>
     {title && (
-      <div className="px-8 py-5 border-b border-gray-50 bg-gradient-to-r from-[#ffffff] to-[#fafafa] flex items-center justify-between relative overflow-hidden">
+      <div className="px-4 py-3 md:px-8 md:py-5 border-b border-gray-50 bg-gradient-to-r from-[#ffffff] to-[#fafafa] flex items-center justify-between relative overflow-hidden">
         <div className="absolute top-0 left-0 w-1 h-full bg-[#C5A065]" />
         <h3 className="font-serif font-bold text-[#0F3D3E] tracking-wide text-sm">{title}</h3>
       </div>
     )}
-    <div className={noPadding ? '' : 'p-8'}>
+    <div className={noPadding ? '' : 'p-4 md:p-8'}>
       {children}
     </div>
   </div>

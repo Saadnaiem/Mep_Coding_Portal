@@ -207,7 +207,17 @@ const App: React.FC = () => {
   // App State
   const [view, setView] = useState<'dashboard' | 'request_details' | 'new_request' | 'employee_inbox' | 'admin_staff' | 'preferences' | 'audit_log'>('dashboard');
   const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() => window.innerWidth > 1024);
+  
+  // Update sidebar on resize
+  useEffect(() => {
+    const handleResize = () => {
+       if (window.innerWidth < 1024) setIsSidebarOpen(false);
+       else setIsSidebarOpen(true);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
   
   // Filtering & Search
   const [searchQuery, setSearchQuery] = useState('');
@@ -1541,22 +1551,22 @@ const App: React.FC = () => {
   };
 
   const Header = () => (
-    <header className="h-60 bg-white border-b border-[#C5A065]/20 flex items-center justify-between px-10 sticky top-0 z-50 shadow-sm/50 backdrop-blur-md bg-white/95">
-      <div className="flex items-center gap-8">
+    <header className="h-24 md:h-60 bg-white border-b border-[#C5A065]/20 flex items-center justify-between px-4 md:px-10 sticky top-0 z-50 shadow-sm/50 backdrop-blur-md bg-white/95">
+      <div className="flex items-center gap-3 md:gap-8">
         <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2.5 hover:bg-[#F0F4F4] rounded-xl transition-all text-[#0F3D3E]">
-          <Menu size={28} />
+          <Menu size={24} className="md:w-7 md:h-7" />
         </button>
-        <div className="flex items-center gap-5 cursor-pointer group" onClick={() => setView('dashboard')}>
-          <div className="w-72 h-56 flex items-center justify-center transition-all duration-500 group-hover:scale-105">
+        <div className="flex items-center gap-3 md:gap-5 cursor-pointer group" onClick={() => setView('dashboard')}>
+          <div className="w-16 h-16 md:w-72 md:h-56 flex items-center justify-center transition-all duration-500 group-hover:scale-105">
              <img src="/logo.png" alt="MEP Logo" className="w-full h-full object-contain drop-shadow-sm" />
           </div>
-          <div className="flex flex-col justify-center h-full pt-2">
-            <h1 className="font-sans font-bold text-4xl tracking-tight text-[#0F3D3E] leading-none mb-2">MEP Coding Portal</h1>
-            <h2 className="text-[11px] font-bold text-[#C5A065] uppercase tracking-[0.05em]">Al Habib Pharmacy</h2>
+          <div className="flex flex-col justify-center h-full pt-1 md:pt-2">
+            <h1 className="font-sans font-bold text-lg md:text-4xl tracking-tight text-[#0F3D3E] leading-none mb-1 md:mb-2">MEP Coding Portal</h1>
+            <h2 className="text-[9px] md:text-[11px] font-bold text-[#C5A065] uppercase tracking-[0.05em]">Al Habib Pharmacy</h2>
           </div>
         </div>
       </div>
-      <div className="flex items-center gap-8">
+      <div className="flex items-center gap-2 md:gap-8">
         {/* Portal Switcher Removed - Role Based Access Only */}
         <div className="hidden md:flex flex-col items-end border-r border-gray-100 pr-8 mr-2">
           <span className="text-sm font-sans font-semibold text-[#0F3D3E]">{currentUserProfile?.full_name || 'Guest'}</span>
@@ -1566,7 +1576,7 @@ const App: React.FC = () => {
               : currentUserProfile?.company_name || 'Vendor'}
           </span>
         </div>
-        <button onClick={() => setIsAuthenticated(false)} className="text-gray-400 hover:text-red-700 p-2 transition-colors"><LogOut size={22} /></button>
+        <button onClick={() => setIsAuthenticated(false)} className="text-gray-400 hover:text-red-700 p-2 transition-colors"><LogOut size={20} className="md:w-6 md:h-6" /></button>
       </div>
     </header>
   );
@@ -1579,12 +1589,12 @@ const App: React.FC = () => {
 
     return (
     <div className="space-y-10 animate-in fade-in duration-700">
-      <div className="flex justify-between items-center border-b border-gray-100 pb-6">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-gray-100 pb-6 gap-4">
         <div>
-          <h2 className="text-4xl font-serif font-black text-[#0F3D3E] tracking-tight mb-2">{title}</h2>
+          <h2 className="text-3xl md:text-4xl font-serif font-black text-[#0F3D3E] tracking-tight mb-2">{title}</h2>
           <p className="text-[#C5A065] text-sm font-bold tracking-wide">{subtitle}</p>
         </div>
-        {activePortal === 'vendor' && <Button onClick={() => setView('new_request')} className="px-8 h-12 shadow-lg shadow-[#0F3D3E]/20 hover:scale-105"><Plus size={20} />New Request</Button>}
+        {activePortal === 'vendor' && <Button onClick={() => setView('new_request')} className="w-full md:w-auto px-8 h-12 shadow-lg shadow-[#0F3D3E]/20 hover:scale-105"><Plus size={20} />New Request</Button>}
       </div>
       <Card title={isInbox ? "Your Action Items" : "Request Pipeline"} noPadding className="border-t-4 border-t-[#C5A065]">
         <div className="overflow-x-auto">
@@ -1809,12 +1819,12 @@ const App: React.FC = () => {
            </div>
         </div>
       )}
-      <div className="flex justify-between items-center border-b border-gray-100 pb-8">
-        <div className="flex items-center gap-6">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-gray-100 pb-8 gap-6 md:gap-0">
+        <div className="flex items-center gap-4 md:gap-6 w-full">
           <button onClick={() => setView('dashboard')} className="p-3 bg-white border border-gray-100 rounded-xl text-gray-400 hover:text-[#0F3D3E] hover:scale-105 transition-all"><ArrowLeft size={24} /></button>
-          <div>
-            <h2 className="text-4xl font-serif font-black text-[#0F3D3E] tracking-tight mb-2">{currentRequest?.request_number}</h2>
-            <div className="flex items-center gap-4">
+          <div className="flex-1">
+            <h2 className="text-2xl md:text-4xl font-serif font-black text-[#0F3D3E] tracking-tight mb-2 break-all">{currentRequest?.request_number}</h2>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
                <Badge 
                  status={currentRequest?.status || 'draft'} 
                  labelSuffix={currentRequest?.status === 'in_review' ? (
@@ -1822,18 +1832,18 @@ const App: React.FC = () => {
                     MOCK_STEPS.find(s => s.step_number === currentRequest?.current_step)?.step_name
                  ) : undefined}
                />
-               <span className="text-xs font-bold text-[#C5A065] uppercase tracking-widest">Created {formatKSA(currentRequest?.created_at!)}</span>
+               <span className="text-[10px] md:text-xs font-bold text-[#C5A065] uppercase tracking-widest">Created {formatKSA(currentRequest?.created_at!)}</span>
             </div>
           </div>
         </div>
-        <div className="flex gap-4">
+        <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
            {isCorrection && (
-                <Button onClick={handleResubmit} className="bg-amber-600 text-white hover:bg-amber-700 h-12 px-6 rounded-xl shadow-lg shadow-amber-600/20 flex items-center gap-2 transition-transform hover:scale-105">
+                <Button onClick={handleResubmit} className="bg-amber-600 text-white hover:bg-amber-700 h-12 px-6 rounded-xl shadow-lg shadow-amber-600/20 flex items-center justify-center gap-2 transition-transform hover:scale-105 w-full sm:w-auto">
                    <Upload size={20} />
                    <span className="font-bold tracking-wide">Submit Corrections</span>
                 </Button>
             )}
-            <Button onClick={generateRequestPDF} className="bg-[#0F3D3E] text-white hover:bg-[#0F3D3E]/90 h-12 px-6 rounded-xl shadow-lg shadow-[#0F3D3E]/20 flex items-center gap-2 transition-transform hover:scale-105">
+            <Button onClick={generateRequestPDF} className="bg-[#0F3D3E] text-white hover:bg-[#0F3D3E]/90 h-12 px-6 rounded-xl shadow-lg shadow-[#0F3D3E]/20 flex items-center justify-center gap-2 transition-transform hover:scale-105 w-full sm:w-auto">
                <Download size={20} />
                <span className="font-bold tracking-wide">Export PDF</span>
             </Button>
@@ -2176,9 +2186,9 @@ const App: React.FC = () => {
 
   const Preferences = () => (
       <div className="space-y-10 animate-in fade-in duration-700">
-          <div className="flex justify-between items-center border-b border-gray-100 pb-6">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-gray-100 pb-6 gap-4">
               <div>
-                  <h2 className="text-4xl font-serif font-black text-[#0F3D3E] tracking-tight mb-2">Preferences</h2>
+                  <h2 className="text-3xl md:text-4xl font-serif font-black text-[#0F3D3E] tracking-tight mb-2">Preferences</h2>
                   <p className="text-[#C5A065] text-sm font-bold tracking-wide">Manage your account settings and security</p>
               </div>
           </div>
@@ -2220,9 +2230,9 @@ const App: React.FC = () => {
 
   const AuditLog = () => (
       <div className="space-y-10 animate-in fade-in duration-700">
-          <div className="flex justify-between items-center border-b border-gray-100 pb-6">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-gray-100 pb-6 gap-4">
               <div>
-                  <h2 className="text-4xl font-serif font-black text-[#0F3D3E] tracking-tight mb-2">Audit Log</h2>
+                  <h2 className="text-3xl md:text-4xl font-serif font-black text-[#0F3D3E] tracking-tight mb-2">Audit Log</h2>
                   <p className="text-[#C5A065] text-sm font-bold tracking-wide">System-wide activity and changes</p>
               </div>
           </div>
@@ -2253,23 +2263,35 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-[#fcfdfc] flex flex-col font-sans text-gray-900">
       <Header />
-      <div className="flex flex-1">
-        <aside className={`${isSidebarOpen ? 'w-80' : 'w-24'} hidden lg:flex flex-col border-r border-gray-100 bg-white transition-all duration-500 h-[calc(100vh-80px)] sticky top-20`}>
-          <div className="p-6 flex flex-col gap-3">
-            <p className={`px-4 text-[10px] font-black text-gray-300 uppercase tracking-widest ${!isSidebarOpen && 'hidden'}`}>General</p>
-            <SidebarItem icon={LayoutDashboard} label="Main Hub" active={view === 'dashboard'} onClick={() => setView('dashboard')} collapsed={!isSidebarOpen} />
-            {activePortal === 'employee' && <SidebarItem icon={Briefcase} label="Task Inbox" active={view === 'employee_inbox'} onClick={() => setView('employee_inbox')} collapsed={!isSidebarOpen} />}
+      <div className="flex flex-1 relative">
+        {/* Mobile Overlay */}
+        {isSidebarOpen && (
+          <div 
+            className="fixed inset-0 bg-black/50 z-30 md:hidden backdrop-blur-sm transition-opacity"
+            onClick={() => setIsSidebarOpen(false)}
+          />
+        )}
+        
+        <aside className={`
+            fixed inset-y-0 left-0 z-40 bg-white border-r border-gray-100 flex flex-col transition-all duration-300
+            h-full md:sticky md:top-24 md:h-[calc(100vh-6rem)]
+            ${isSidebarOpen ? 'translate-x-0 w-80 shadow-2xl md:shadow-none' : '-translate-x-full md:translate-x-0 w-80 md:w-24'}
+        `}>
+          <div className="p-4 md:p-6 flex flex-col gap-3">
+            <p className={`px-4 text-[10px] font-black text-gray-300 uppercase tracking-widest ${!isSidebarOpen ? 'md:hidden' : ''}`}>General</p>
+            <SidebarItem icon={LayoutDashboard} label="Main Hub" active={view === 'dashboard'} onClick={() => { setView('dashboard'); if(window.innerWidth < 768) setIsSidebarOpen(false); }} collapsed={!isSidebarOpen} />
+            {activePortal === 'employee' && <SidebarItem icon={Briefcase} label="Task Inbox" active={view === 'employee_inbox'} onClick={() => { setView('employee_inbox'); if(window.innerWidth < 768) setIsSidebarOpen(false); }} collapsed={!isSidebarOpen} />}
             {activePortal === 'employee' && currentUserEmployee?.role === 'super_admin' && (
               <>
-                <SidebarItem icon={Users} label="Access Management" active={view === 'admin_staff'} onClick={() => setView('admin_staff')} collapsed={!isSidebarOpen} />
-                <SidebarItem icon={FileText} label="Master Reports" active={view === 'reports'} onClick={() => setView('reports')} collapsed={!isSidebarOpen} />
+                <SidebarItem icon={Users} label="Access Management" active={view === 'admin_staff'} onClick={() => { setView('admin_staff'); if(window.innerWidth < 768) setIsSidebarOpen(false); }} collapsed={!isSidebarOpen} />
+                <SidebarItem icon={FileText} label="Master Reports" active={view === 'reports'} onClick={() => { setView('reports'); if(window.innerWidth < 768) setIsSidebarOpen(false); }} collapsed={!isSidebarOpen} />
               </>
             )}
-            <SidebarItem icon={ClipboardList} label="Audit Log" active={view === 'audit_log'} onClick={() => setView('audit_log')} collapsed={!isSidebarOpen} />
-            <SidebarItem icon={Settings} label="Preferences" active={view === 'preferences'} onClick={() => setView('preferences')} collapsed={!isSidebarOpen} />
+            <SidebarItem icon={ClipboardList} label="Audit Log" active={view === 'audit_log'} onClick={() => { setView('audit_log'); if(window.innerWidth < 768) setIsSidebarOpen(false); }} collapsed={!isSidebarOpen} />
+            <SidebarItem icon={Settings} label="Preferences" active={view === 'preferences'} onClick={() => { setView('preferences'); if(window.innerWidth < 768) setIsSidebarOpen(false); }} collapsed={!isSidebarOpen} />
           </div>
         </aside>
-        <main className="flex-1 p-8 lg:p-14 overflow-y-auto h-[calc(100vh-80px)] scroll-smooth">
+        <main className="flex-1 p-4 md:p-8 lg:p-14 overflow-y-auto h-[calc(100vh-6rem)] scroll-smooth w-full">
           {view === 'dashboard' && Dashboard()}
           {view === 'request_details' && <RequestDetails />}
           {view === 'new_request' && NewRequestWizard()}

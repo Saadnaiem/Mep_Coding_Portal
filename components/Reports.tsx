@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Card, Button, Input, Select } from './UI'; // Reuse UI components
 import { db } from '../services/database';
-import { ProductRequest, Product } from '../types';
+import { ProductRequest, Product, RequestStatus } from '../types';
 import { Download, Calendar, Filter, Search } from 'lucide-react';
 import * as XLSX from 'xlsx'; // Need to check if installed, if not fallback to CSV
 
@@ -27,6 +27,7 @@ interface ReportItem {
     cost_price: number;
     sales_price: number;
     margin: number;
+    status: string;
 }
 
 export const Reports: React.FC = () => {
@@ -81,7 +82,8 @@ export const Reports: React.FC = () => {
                     item_code: p.erp_item_code || 'N/A',
                     cost_price: cost,
                     sales_price: retail,
-                    margin: parseFloat(margin.toFixed(2))
+                    margin: parseFloat(margin.toFixed(2)),
+                    status: req?.status || 'draft'
                 };
             });
 
@@ -172,16 +174,71 @@ export const Reports: React.FC = () => {
         document.body.removeChild(link);
     };
 
+    const handleEcommerceExport = () => {
+        // Filter: Status completed AND item_code exists AND not 'N/A'
+        const dataToExport = rawData.filter(item => 
+            item.status === 'completed' && 
+            item.item_code && 
+            item.item_code !== 'N/A'
+        );
+
+        if (dataToExport.length === 0) {
+            alert("No completed products with Item Code found.");
+            return;
+        }
+
+        const headers = [
+            'SKU UBC/GTIN', 'NAME/ DESCRIPTION_US', 'NAME/ DESCRIPTION_AR', 'BRAND Name_US', 
+            'BRAND Name_AR', 'SHORT DESCRIPTION_US', 'SHORT DESCRIPTION_AR', 'STORAGE_US', 
+            'STORAGE_AR', 'COMPOSITION_US', 'COMPOSITION_AR', 'INDICATION_AR', 'INDICATION_US', 
+            'HOW_TO_USE_US', 'HOW_TO_USE_AR', 'POSSIBLE_SIDE_EFFECTS/WARNINGS_US', 
+            'POSSIBLE_SIDE_EFFECTS/WARNINGS_AR', 'Category', 'Group', 'Subgroup', 
+            'Tags/Filters  (*Tags can be chosen based on the filters from column V to AG, with comma seprated*)', 
+            'Suggested Filters in BEAUTY',
+            'Division', 'Department', 'Category (POP)', 'Sub-Category (POP)', 'Class'
+        ];
+
+        const rows = dataToExport.map(item => {
+            const row = new Array(headers.length).fill('');
+            row[0] = item.item_code; // SKU UBC/GTIN
+            row[1] = item.description_en; // NAME/ DESCRIPTION_US
+            row[2] = item.description_ar; // NAME/ DESCRIPTION_AR
+            row[3] = item.brand; // BRAND Name_US
+            row[4] = ''; // BRAND Name_AR
+            
+            // Note: Template columns 17 (Category), 18 (Group), 19 (Subgroup) are left empty
+            
+            // Append 5-level hierarchy
+            row[22] = item.division;     // Division
+            row[23] = item.department;   // Department
+            row[24] = item.category;     // Category (POP)
+            row[25] = item.sub_category; // Sub-Category (POP)
+            row[26] = item.class_name;   // Class
+
+            return row;
+        });
+
+        const workbook = XLSX.utils.book_new();
+        const worksheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+        XLSX.utils.book_append_sheet(workbook, worksheet, "E-Commerce Form");
+        XLSX.writeFile(workbook, `Ecommerce_Form_${new Date().toISOString().split('T')[0]}.xlsx`);
+    };
+
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
-             <div className="flex justify-between items-center border-b border-gray-100 pb-6">
+             <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-gray-100 pb-6 gap-4">
                 <div>
-                   <h2 className="text-4xl font-serif font-black text-[#0F3D3E] tracking-tight mb-2">Master Report</h2>
-                   <p className="text-[#C5A065] text-sm font-bold tracking-wide">Extract products, prices, and vendor data</p>
+                   <h2 className="text-2xl md:text-4xl font-serif font-black text-[#0F3D3E] tracking-tight mb-2">Master Report</h2>
+                   <p className="text-[#C5A065] text-xs md:text-sm font-bold tracking-wide">Extract products, prices, and vendor data</p>
                 </div>
-                <Button onClick={handleExport} className="px-6 h-12 bg-[#0F3D3E] text-white hover:bg-[#C5A065] shadow-lg">
-                    <Download className="mr-2" size={20} /> Export CSV
-                </Button>
+                <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+                    <Button onClick={handleEcommerceExport} variant="success" className="w-full sm:w-auto px-6 h-12 shadow-lg transform hover:scale-105 transition-transform duration-200 text-xs md:text-sm">
+                        <Download className="mr-2" size={18} /> E-Commerce Form
+                    </Button>
+                    <Button onClick={handleExport} className="w-full sm:w-auto px-6 h-12 bg-[#0F3D3E] text-white hover:bg-[#C5A065] shadow-lg text-xs md:text-sm">
+                        <Download className="mr-2" size={18} /> Export CSV
+                    </Button>
+                </div>
             </div>
 
             <Card className="border-t-4 border-t-[#0F3D3E]">
