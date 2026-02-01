@@ -1966,7 +1966,7 @@ const App: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 p-6 md:p-10 bg-[#f8f9fa] border-t border-gray-100">
           <div className="space-y-6">
             {/* Vendor Documents Card */}
-           {(activePortal === 'staff' || (activePortal === 'vendor' && currentVendor?.vendor_type === 'new')) && (
+           {(activePortal === 'employee' || (activePortal === 'vendor' && currentVendor?.vendor_type === 'new')) && (
                 <Card title="Vendor Documents" className="bg-white shadow-sm border border-gray-100">
                     <div className="space-y-4">
                         {[
