@@ -152,6 +152,7 @@ export interface StepAction {
   comment: string;
   action_at: string;
   actor_name?: string;
+  actor_role?: string;
 }
 
 export interface RequestStep {

@@ -134,7 +134,7 @@ class DatabaseService {
       .from('request_history')
       .select(`
         *,
-        actor:profiles(full_name)
+        actor:profiles(full_name, role)
       `)
       .eq('request_id', requestId)
       .order('created_at', { ascending: false });
@@ -144,7 +144,8 @@ class DatabaseService {
     return data.map((item: any) => ({
       ...item,
       action_at: item.created_at, // Map DB column 'created_at' to Type 'action_at'
-      actor_name: item.actor?.full_name || 'Unknown'
+      actor_name: item.actor?.full_name || 'Unknown',
+      actor_role: item.actor?.role || ''
     }));
   }
 

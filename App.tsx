@@ -2008,7 +2008,14 @@ const App: React.FC = () => {
                               })}
                           </span>
                       </div>
-                      <p className="text-[10px] text-[#0F3D3E]/60 font-bold">by <span className="text-[#0F3D3E]">{a.actor_name}</span></p>
+                      <p className="text-[10px] text-[#0F3D3E]/60 font-bold">
+                        by <span className="text-[#0F3D3E]">{a.actor_name}</span>
+                        {a.actor_role && (
+                           <span className="block mt-0.5 text-[#C5A065] uppercase tracking-wider text-[9px]">
+                             {ROLE_LABELS[a.actor_role as EmployeeRole] || a.actor_role.replace(/_/g, ' ')}
+                           </span>
+                        )}
+                      </p>
                       {a.comment && <div className="mt-4 p-5 bg-[#F0F4F4] rounded-tr-2xl rounded-br-2xl rounded-bl-2xl border border-gray-100 text-sm italic text-[#0F3D3E]/80 leading-relaxed font-serif relative"><span className="absolute -top-3 -left-1 text-4xl text-[#C5A065] opacity-30 font-serif">"</span>{a.comment}</div>}
                    </div>
                  ))}
