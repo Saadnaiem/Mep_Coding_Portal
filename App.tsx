@@ -1070,7 +1070,8 @@ const App: React.FC = () => {
     });
 
     autoTable(doc, {
-      startY: 30,
+      startY: 40,
+      margin: { bottom: 25 }, // Avoid footer overlaps
       head: [['Step', 'Role / Responsibility', 'Status', 'Actor', 'Timestamp', 'Comments']],
       body: fullSequence.map(i => [i.step, i.role, '', i.actor, i.date, i.comment]), 
       theme: 'grid',
@@ -1112,7 +1113,8 @@ const App: React.FC = () => {
     let yPos = 20;
 
     const checkPageBreak = (heightNeeded: number) => {
-        if (yPos + heightNeeded > pageHeight - 10) {
+        // Enforce bottom margin of 25mm to avoid footer overlap
+        if (yPos + heightNeeded > pageHeight - 25) {
             doc.addPage();
             yPos = 20;
         }
@@ -1435,8 +1437,8 @@ const App: React.FC = () => {
         const col2W = 110; 
 
         fields.forEach((field) => {
-             // Check page break
-             if (nY > 270) {
+             // Check page break - Increase bottom margin to 25mm (297 - 25 = 272)
+             if (nY > 272) {
                  doc.addPage();
                  nY = 20;
              }
@@ -1516,7 +1518,12 @@ const App: React.FC = () => {
 
     if (actions && actions.length > 0) {
         actions.forEach((a) => {
-            if (hY > 270) { doc.addPage(); hY = 20; }
+            // Check page break - Conservative limit (297 - 35 = 262)
+            if (hY > 262) { 
+                doc.addPage(); 
+                hY = 25; // Reset Y
+                // Optional: valid to redraw header here if needed, but keeping simple for now
+            }
             
             const dateStr = new Date(a.action_at).toLocaleString('en-US', { 
                 day: '2-digit', month: 'short', year: 'numeric', 
