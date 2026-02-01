@@ -977,7 +977,7 @@ const App: React.FC = () => {
     // Header Text
     centerText("MEP CODING PORTAL", 45, 24, "times", "bold", "#0F3D3E");
     centerText("Al Habib Pharmacy Product Request Summary", 55, 14, "helvetica", "bold", "#C5A065");
-    centerText(`Request ID: ${currentRequest.request_number}`, 65, 12, "helvetica", "normal", "#555555");
+    centerText(`Request ID: ${currentRequest.request_number}`, 65, 16, "helvetica", "bold", "#1E40AF");
     
     // Request Meta Data Table
     autoTable(doc, {
@@ -1240,16 +1240,34 @@ const App: React.FC = () => {
         const colW = (pageWidth - 30) / 3;
         
         // Helper to draw fields in columns
-        const drawField = (lbl: string, val: any, x: number, y: number) => {
-            doc.setFontSize(5);
-            doc.setTextColor(120);
+        const drawField = (lbl: string, val: any, x: number, y: number, isProminent: boolean = false) => {
+            const boxWidth = colW - 5;
+            
+            // Background box for better readability
+            doc.setFillColor(isProminent ? 240 : 252, isProminent ? 255 : 252, isProminent ? 245 : 252);
+            if (isProminent) {
+                // Stronger border for prominent
+                 doc.setDrawColor(15, 61, 62); 
+                 doc.setLineWidth(0.5);
+                 doc.roundedRect(x - 2, y - 3, boxWidth, 14, 1, 1, 'FD');
+            } else {
+                 // Subtle background for others
+                 doc.roundedRect(x - 2, y - 3, boxWidth, 12, 1, 1, 'F');
+            }
+
+            // LABEL
+            doc.setFontSize(isProminent ? 7 : 6); // Increased base size
+            doc.setTextColor(isProminent ? 15 : 100, isProminent ? 61 : 100, isProminent ? 62 : 100);
             doc.setFont("helvetica", "bold");
             doc.text(lbl.toUpperCase(), x, y);
             
-            doc.setFontSize(7);
+            // VALUE
+            doc.setFontSize(isProminent ? 11 : 9); // Increased base size
             doc.setTextColor(15, 61, 62);
-            doc.text(String(val || '-'), x, y + 3.5);
-            return y + 8;
+            doc.setFont("helvetica", isProminent ? "bold" : "normal");
+            doc.text(String(val || '-'), x, y + 4 + (isProminent ? 1 : 0));
+            
+            return y + (isProminent ? 18 : 15); // Increased spacing
         };
 
         // Column 1
@@ -1259,7 +1277,7 @@ const App: React.FC = () => {
         cy1 = drawField("Manufacturer", p.manufacturer, 15, cy1);
         cy1 = drawField("Origin", p.country_of_origin, 15, cy1);
         cy1 = drawField("Vendor System Code", p.vendor_system_code, 15, cy1);
-        cy1 = drawField("Item Code", p.erp_item_code, 15, cy1);
+        cy1 = drawField("Item Code", p.erp_item_code, 15, cy1, true);
         cy1 = drawField("Item Group", p.item_group, 15, cy1);
         cy1 = drawField("Item Sub Group", p.item_sub_group, 15, cy1);
 
