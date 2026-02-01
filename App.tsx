@@ -52,7 +52,7 @@ import {
 import { db } from './services/database';
 import { supabase } from './services/supabase'; // Import supabase directly for auth
 import { getDivisionsForManager, getCategoryManagerForDivision } from './services/authService';
-import { Button, Card, Badge, Input, Select, Stepper, Modal } from './components/UI';
+import { Button, Card, Badge, Input, Select, Stepper, Modal, FileInput } from './components/UI';
 import { NewProductEntry } from './components/NewProductEntry';
 import { NewVendorForm } from './components/NewVendorForm';
 import { StaffManagement } from './components/StaffManagement';
@@ -1792,6 +1792,48 @@ const App: React.FC = () => {
     const isEditable = isCorrection || (isRequestActionable && currentRequest?.current_step === 7);
     
     const [assignedManagerName, setAssignedManagerName] = useState<string | null>(null);
+    const [editableVendor, setEditableVendor] = useState<Partial<any>>({});
+    const [uploadingState, setUploadingState] = useState<Record<string, boolean>>({});
+
+    useEffect(() => {
+        // Initialize editable vendor when entering correction mode
+        if (isEditable && currentVendor) {
+            setEditableVendor(currentVendor);
+        }
+    }, [isEditable, currentVendor]);
+
+    const handleVendorUpload = async (file: File | null, fieldName: string) => {
+        if (!file || !currentVendor?.id) return;
+  
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Math.random().toString(36).substring(2)}_${Date.now()}.${fileExt}`;
+        const filePath = `vendor-docs/${fileName}`;
+  
+        setUploadingState(prev => ({ ...prev, [fieldName]: true }));
+  
+        try {
+            const { error: uploadError } = await supabase.storage
+              .from('portal-uploads')
+              .upload(filePath, file);
+  
+            if (uploadError) throw uploadError;
+  
+            const { data: { publicUrl } } = supabase.storage
+              .from('portal-uploads')
+              .getPublicUrl(filePath);
+            
+            // Update local state immediately for UI feedback
+            setEditableVendor(prev => ({ ...prev, [fieldName]: publicUrl }));
+            // Also update currentVendor (global state) so it persists if we switch tabs/views
+            setCurrentVendor(prev => ({ ...prev, [fieldName]: publicUrl }));
+
+        } catch (error) {
+            console.error('Error uploading file:', error);
+            alert('Error uploading file');
+        } finally {
+            setUploadingState(prev => ({ ...prev, [fieldName]: false }));
+        }
+    };
 
     // Using shared 'editableProducts' from Parent (App) state now, so changes persist for Action saving
 
@@ -1803,6 +1845,11 @@ const App: React.FC = () => {
         if (!confirm('Submit corrected application?')) return;
         setIsSaving(true);
         try {
+            // Update Vendor Details if changed
+            if (currentVendor?.id && Object.keys(editableVendor).length > 0) {
+                 await db.updateVendor(currentVendor.id, editableVendor);
+            }
+
             // Update products only if we have them in editable state
             if (editableProducts.length > 0) {
                 for (const p of editableProducts) {
@@ -1918,6 +1965,62 @@ const App: React.FC = () => {
         <div className="p-4 md:p-12 overflow-x-auto"><Stepper currentStep={currentRequest?.current_step || 1} totalSteps={MOCK_STEPS.length} labels={MOCK_STEPS.map(s => s.step_name)} /></div>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 p-6 md:p-10 bg-[#f8f9fa] border-t border-gray-100">
           <div className="space-y-6">
+            {/* Vendor Documents Card */}
+           {(activePortal === 'staff' || (activePortal === 'vendor' && currentVendor?.vendor_type === 'new')) && (
+                <Card title="Vendor Documents" className="bg-white shadow-sm border border-gray-100">
+                    <div className="space-y-4">
+                        {[
+                            { label: "CR Document", key: "cr_document_url" },
+                            { label: "VAT Certificate", key: "vat_certificate_url" },
+                            { label: "Bank Certificate", key: "bank_certificate_url" },
+                            { label: "Product Catalog", key: "catalog_url" },
+                            { label: "Other Documents", key: "other_documents_url" },
+                        ].map((doc) => {
+                            const url = isEditable && editableVendor[doc.key] ? editableVendor[doc.key] : currentVendor?.[doc.key];
+                            return (
+                                <div key={doc.key} className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-3 bg-gray-50 rounded-lg border border-gray-100 gap-3">
+                                    <div>
+                                        <p className="font-bold text-[#0F3D3E] text-sm">{doc.label}</p>
+                                        {/* Status indicator for employees */}
+                                        {url ? (
+                                            <p className="text-[10px] text-green-600 font-bold flex items-center gap-1"><CheckCircle size={10} /> Available</p>
+                                        ) : (
+                                            <p className="text-[10px] text-gray-400 font-bold">Not Uploaded</p>
+                                        )}
+                                    </div>
+                                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                                        {isEditable ? (
+                                             <div className="w-full sm:w-auto">
+                                                {/* Upload Button for Vendor Correction */}
+                                                <FileInput 
+                                                    label="" 
+                                                    className="!py-2 !px-3 !text-xs !bg-white" 
+                                                    loading={uploadingState[doc.key]}
+                                                    onFileSelect={(f) => handleVendorUpload(f, doc.key)}
+                                                />
+                                                {url && (
+                                                     <a href={url} target="_blank" className="text-[10px] text-[#0F3D3E] underline mt-1 block text-right">View Current</a>
+                                                )}
+                                             </div>
+                                        ) : (
+                                            url && (
+                                                <a 
+                                                    href={url} 
+                                                    target="_blank" 
+                                                    className="flex items-center gap-2 px-4 py-2 bg-[#0F3D3E] text-white rounded-lg text-xs font-bold hover:bg-[#0F3D3E]/90 transition-colors"
+                                                >
+                                                    <Download size={14} /> Download
+                                                </a>
+                                            )
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </Card>
+           )}
+
             <Card title="Product Listing Details" className="bg-white shadow-sm border border-gray-100">
                <div className="space-y-6">
                  {(isEditable && editableProducts.length > 0 ? editableProducts : products).map(p => (
