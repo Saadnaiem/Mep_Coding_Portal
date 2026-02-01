@@ -86,6 +86,30 @@ export const Select: React.FC<React.SelectHTMLAttributes<HTMLSelectElement> & { 
   </div>
 ));
 
+export const FileInput: React.FC<React.InputHTMLAttributes<HTMLInputElement> & { label: string; onFileSelect?: (file: File | null) => void; loading?: boolean }> = ({ label, onFileSelect, loading, className = '', ...props }) => {
+  return (
+    <div className="w-full group">
+      <label className="block text-[11px] font-serif font-bold text-[#0F3D3E]/70 uppercase tracking-widest mb-2 ml-1 transition-colors group-hover:text-[#C5A065]">{label}</label>
+      <div className={`relative flex items-center w-full px-5 py-3.5 rounded-lg border border-gray-200 bg-gray-50 hover:bg-white transition-all duration-300 hover:border-gray-300 ${loading ? 'opacity-70 cursor-wait' : ''}`}>
+        <input 
+          type="file" 
+          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+          onChange={(e) => onFileSelect && onFileSelect(e.target.files ? e.target.files[0] : null)}
+          disabled={loading}
+          {...props}
+        />
+        <div className="flex items-center gap-3 w-full">
+            <div className="p-2 bg-[#F0F4F4] rounded-lg text-[#0F3D3E]"><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg></div>
+            <div className="flex-1 min-w-0">
+               <p className="text-sm font-medium text-[#0F3D3E] truncate">{loading ? 'Uploading...' : 'Click to Upload or Drag File'}</p>
+               <p className="text-[10px] text-gray-500">PDF, Excel, Images supported</p>
+            </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: string; children: React.ReactNode }> = ({ isOpen, onClose, title, children }) => {
   if (!isOpen) return null;
   return (

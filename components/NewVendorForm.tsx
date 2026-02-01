@@ -1,8 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
-import { Card, Input, Select, Button } from './UI';
+import { Card, Input, Select, FileInput } from './UI';
 import { Vendor } from '../types';
-import { Save } from 'lucide-react';
+import { supabase } from '../services/supabase';
+import { Save, CheckCircle } from 'lucide-react';
 
 interface NewVendorFormProps {
   currentVendor: Partial<Vendor>;
@@ -40,13 +41,38 @@ export const NewVendorForm: React.FC<NewVendorFormProps> = ({ currentVendor, onC
   // However, since we spread `...prev` and `...currentVendor`, if they match, no re-render.
   // But to be safer, we can just use the local state for inputs and only sync up.
   
-  const handleChange = (field: keyof Vendor, value: any) => {
-    setLocalForm(prev => ({ ...prev, [field]: value }));
-  };
+  const [uploadingState, setUploadingState] = useState<Record<string, boolean>>({});
 
-  const getValue = (field: keyof Vendor): string | number | readonly string[] => {
-      const val = localForm[field];
-      return val !== undefined && val !== null ? val : '';
+  const handleUpload = async (file: File | null, fieldName: keyof Vendor) => {
+      if (!file) return;
+
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Math.random().toString(36).substring(2)}_${Date.now()}.${fileExt}`;
+      const filePath = `vendor-docs/${fileName}`;
+
+      setUploadingState(prev => ({ ...prev, [fieldName]: true }));
+
+      try {
+          const { error: uploadError } = await supabase.storage
+            .from('portal-uploads')
+            .upload(filePath, file);
+
+          if (uploadError) {
+              throw uploadError;
+          }
+
+          // Get public URL
+          const { data: { publicUrl } } = supabase.storage
+            .from('portal-uploads')
+            .getPublicUrl(filePath);
+
+          handleChange(fieldName, publicUrl);
+      } catch (error) {
+          console.error('Error uploading file:', error);
+          alert('Error uploading file. Please try again.');
+      } finally {
+          setUploadingState(prev => ({ ...prev, [fieldName]: false }));
+      }
   };
 
   return (
@@ -101,6 +127,31 @@ export const NewVendorForm: React.FC<NewVendorFormProps> = ({ currentVendor, onC
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <Input label="Ship To Address" value={getValue('ship_to')} onChange={e => handleChange('ship_to', e.target.value)} />
                     <Input label="Bill To Address" value={getValue('bill_to')} onChange={e => handleChange('bill_to', e.target.value)} />
+                 </div>
+
+                 {/* Uploads */}
+                 <h4 className="font-serif font-bold text-[#0F3D3E] text-sm uppercase tracking-widest mb-4 border-b border-[#C5A065]/30 pb-2 pt-4">Required Documents</h4>
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <FileInput label="CR Document" onFileSelect={(f) => handleUpload(f, 'cr_document_url')} loading={uploadingState['cr_document_url']} accept=".pdf,.png,.jpg,.jpeg" />
+                        {localForm.cr_document_url && <a href={localForm.cr_document_url} target="_blank" className="text-[10px] text-green-600 flex items-center gap-1 mt-1 font-bold"><CheckCircle size={12}/> File Uploaded</a>}
+                    </div>
+                    <div>
+                        <FileInput label="VAT Certificate" onFileSelect={(f) => handleUpload(f, 'vat_certificate_url')} loading={uploadingState['vat_certificate_url']} accept=".pdf,.png,.jpg,.jpeg" />
+                        {localForm.vat_certificate_url && <a href={localForm.vat_certificate_url} target="_blank" className="text-[10px] text-green-600 flex items-center gap-1 mt-1 font-bold"><CheckCircle size={12}/> File Uploaded</a>}
+                    </div>
+                    <div>
+                        <FileInput label="Bank Certificate" onFileSelect={(f) => handleUpload(f, 'bank_certificate_url')} loading={uploadingState['bank_certificate_url']} accept=".pdf,.png,.jpg,.jpeg" />
+                        {localForm.bank_certificate_url && <a href={localForm.bank_certificate_url} target="_blank" className="text-[10px] text-green-600 flex items-center gap-1 mt-1 font-bold"><CheckCircle size={12}/> File Uploaded</a>}
+                    </div>
+                    <div>
+                         <FileInput label="Product Catalog / Portfolio" onFileSelect={(f) => handleUpload(f, 'catalog_url')} loading={uploadingState['catalog_url']} accept=".pdf,.xlsx,.xls,.csv" />
+                         {localForm.catalog_url && <a href={localForm.catalog_url} target="_blank" className="text-[10px] text-green-600 flex items-center gap-1 mt-1 font-bold"><CheckCircle size={12}/> File Uploaded</a>}
+                    </div>
+                    <div className="md:col-span-2">
+                        <FileInput label="Other Supporting Documents" onFileSelect={(f) => handleUpload(f, 'other_documents_url')} loading={uploadingState['other_documents_url']} accept=".pdf,.zip,.rar" />
+                        {localForm.other_documents_url && <a href={localForm.other_documents_url} target="_blank" className="text-[10px] text-green-600 flex items-center gap-1 mt-1 font-bold"><CheckCircle size={12}/> File Uploaded</a>}
+                    </div>
                  </div>
              </div>
         </Card>

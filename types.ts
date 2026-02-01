@@ -74,6 +74,13 @@ export interface Vendor {
   bank_account_number?: string;
   iban_number?: string;
   supplier_name_in_bank?: string;
+
+  // Documents
+  cr_document_url?: string;
+  vat_certificate_url?: string;
+  bank_certificate_url?: string;
+  catalog_url?: string;
+  other_documents_url?: string;
 }
 
 export interface ProductRequest {
