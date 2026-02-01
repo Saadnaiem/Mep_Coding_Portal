@@ -1976,12 +1976,15 @@ const App: React.FC = () => {
                             { label: "Product Catalog", key: "catalog_url" },
                             { label: "Other Documents", key: "other_documents_url" },
                         ].map((doc) => {
-                            const url = isEditable && editableVendor[doc.key] ? editableVendor[doc.key] : currentVendor?.[doc.key];
+                            const targetVendor = activePortal === 'vendor' ? currentVendor : currentRequest?.vendor;
+                            const isVendorEditing = activePortal === 'vendor' && isEditable;
+                            const url = isVendorEditing && editableVendor[doc.key] ? editableVendor[doc.key] : targetVendor?.[doc.key];
+                            
                             return (
                                 <div key={doc.key} className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-3 bg-gray-50 rounded-lg border border-gray-100 gap-3">
                                     <div>
                                         <p className="font-bold text-[#0F3D3E] text-sm">{doc.label}</p>
-                                        {/* Status indicator for employees */}
+                                        {/* Status indicator */}
                                         {url ? (
                                             <p className="text-[10px] text-green-600 font-bold flex items-center gap-1"><CheckCircle size={10} /> Available</p>
                                         ) : (
@@ -1989,7 +1992,7 @@ const App: React.FC = () => {
                                         )}
                                     </div>
                                     <div className="flex items-center gap-2 w-full sm:w-auto">
-                                        {isEditable ? (
+                                        {isVendorEditing ? (
                                              <div className="w-full sm:w-auto">
                                                 {/* Upload Button for Vendor Correction */}
                                                 <FileInput 
