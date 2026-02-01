@@ -1346,16 +1346,7 @@ const App: React.FC = () => {
         doc.line(15, yPos - 4, pageWidth - 15, yPos - 4);
     });
 
-    // Footer with Page Numbers
-    const pageCount = doc.getNumberOfPages();
-    for(let i = 1; i <= pageCount; i++) {
-        // ... existing footer loop
-        doc.setPage(i);
-        doc.setFontSize(8);
-        doc.setTextColor(150);
-        doc.text(`Page ${i} of ${pageCount}`, doc.internal.pageSize.width - 20, doc.internal.pageSize.height - 10, { align: 'right' });
-        doc.text(`Generated on ${new Date().toLocaleString()}`, 14, doc.internal.pageSize.height - 10);
-    }
+    // Old loop removed to avoid duplicates - footer logic consolidated at end of function
     
     // --- NEW VENDOR REGISTRATION PAGE ---
     // Condition: Check if vendor_type is 'new' OR explicitly requested by type
