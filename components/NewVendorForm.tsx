@@ -41,6 +41,15 @@ export const NewVendorForm: React.FC<NewVendorFormProps> = ({ currentVendor, onC
   // However, since we spread `...prev` and `...currentVendor`, if they match, no re-render.
   // But to be safer, we can just use the local state for inputs and only sync up.
   
+  const handleChange = (field: keyof Vendor, value: any) => {
+    setLocalForm(prev => ({ ...prev, [field]: value }));
+  };
+
+  const getValue = (field: keyof Vendor): string | number | readonly string[] => {
+      const val = localForm[field];
+      return val !== undefined && val !== null ? val : '';
+  };
+  
   const [uploadingState, setUploadingState] = useState<Record<string, boolean>>({});
 
   const handleUpload = async (file: File | null, fieldName: keyof Vendor) => {
