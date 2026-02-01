@@ -1965,64 +1965,6 @@ const App: React.FC = () => {
         <div className="p-4 md:p-12 overflow-x-auto"><Stepper currentStep={currentRequest?.current_step || 1} totalSteps={MOCK_STEPS.length} labels={MOCK_STEPS.map(s => s.step_name)} /></div>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 p-6 md:p-10 bg-[#f8f9fa] border-t border-gray-100">
           <div className="space-y-6">
-            {/* Vendor Documents Card */}
-           {(activePortal === 'employee' || (activePortal === 'vendor' && currentVendor?.vendor_type === 'new')) && (
-                <Card title="Vendor Documents" className="bg-white shadow-sm border border-gray-100">
-                    <div className="space-y-4">
-                        {[
-                            { label: "CR Document", key: "cr_document_url" },
-                            { label: "VAT Certificate", key: "vat_certificate_url" },
-                            { label: "Bank Certificate", key: "bank_certificate_url" },
-                            { label: "Product Catalog", key: "catalog_url" },
-                            { label: "Other Documents", key: "other_documents_url" },
-                        ].map((doc) => {
-                            const targetVendor = activePortal === 'vendor' ? currentVendor : currentRequest?.vendor;
-                            const isVendorEditing = activePortal === 'vendor' && isEditable;
-                            const url = isVendorEditing && editableVendor[doc.key] ? editableVendor[doc.key] : targetVendor?.[doc.key];
-                            
-                            return (
-                                <div key={doc.key} className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-3 bg-gray-50 rounded-lg border border-gray-100 gap-3">
-                                    <div>
-                                        <p className="font-bold text-[#0F3D3E] text-sm">{doc.label}</p>
-                                        {/* Status indicator */}
-                                        {url ? (
-                                            <p className="text-[10px] text-green-600 font-bold flex items-center gap-1"><CheckCircle size={10} /> Available</p>
-                                        ) : (
-                                            <p className="text-[10px] text-gray-400 font-bold">Not Uploaded</p>
-                                        )}
-                                    </div>
-                                    <div className="flex items-center gap-2 w-full sm:w-auto">
-                                        {isVendorEditing ? (
-                                             <div className="w-full sm:w-auto">
-                                                {/* Upload Button for Vendor Correction */}
-                                                <FileInput 
-                                                    label="" 
-                                                    className="!py-2 !px-3 !text-xs !bg-white" 
-                                                    loading={uploadingState[doc.key]}
-                                                    onFileSelect={(f) => handleVendorUpload(f, doc.key)}
-                                                />
-                                                {url && (
-                                                     <a href={url} target="_blank" className="text-[10px] text-[#0F3D3E] underline mt-1 block text-right">View Current</a>
-                                                )}
-                                             </div>
-                                        ) : (
-                                            url && (
-                                                <a 
-                                                    href={url} 
-                                                    target="_blank" 
-                                                    className="flex items-center gap-2 px-4 py-2 bg-[#0F3D3E] text-white rounded-lg text-xs font-bold hover:bg-[#0F3D3E]/90 transition-colors"
-                                                >
-                                                    <Download size={14} /> Download
-                                                </a>
-                                            )
-                                        )}
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                </Card>
-           )}
 
             <Card title="Product Listing Details" className="bg-white shadow-sm border border-gray-100">
                <div className="space-y-6">
@@ -2162,6 +2104,65 @@ const App: React.FC = () => {
                  ))}
                </div>
             </Card>
+
+            {/* Vendor Documents Card */}
+           {(activePortal === 'employee' || (activePortal === 'vendor' && currentVendor?.vendor_type === 'new')) && (
+                <Card title="Vendor Documents" className="bg-white shadow-sm border border-gray-100">
+                    <div className="space-y-4">
+                        {[
+                            { label: "CR Document", key: "cr_document_url" },
+                            { label: "VAT Certificate", key: "vat_certificate_url" },
+                            { label: "Bank Certificate", key: "bank_certificate_url" },
+                            { label: "Product Catalog", key: "catalog_url" },
+                            { label: "Other Documents", key: "other_documents_url" },
+                        ].map((doc) => {
+                            const targetVendor = activePortal === 'vendor' ? currentVendor : currentRequest?.vendor;
+                            const isVendorEditing = activePortal === 'vendor' && isEditable;
+                            const url = isVendorEditing && editableVendor[doc.key] ? editableVendor[doc.key] : targetVendor?.[doc.key];
+                            
+                            return (
+                                <div key={doc.key} className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-3 bg-gray-50 rounded-lg border border-gray-100 gap-3">
+                                    <div>
+                                        <p className="font-bold text-[#0F3D3E] text-sm">{doc.label}</p>
+                                        {/* Status indicator */}
+                                        {url ? (
+                                            <p className="text-[10px] text-green-600 font-bold flex items-center gap-1"><CheckCircle size={10} /> Available</p>
+                                        ) : (
+                                            <p className="text-[10px] text-gray-400 font-bold">Not Uploaded</p>
+                                        )}
+                                    </div>
+                                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                                        {isVendorEditing ? (
+                                             <div className="w-full sm:w-auto">
+                                                {/* Upload Button for Vendor Correction */}
+                                                <FileInput 
+                                                    label="" 
+                                                    className="!py-2 !px-3 !text-xs !bg-white" 
+                                                    loading={uploadingState[doc.key]}
+                                                    onFileSelect={(f) => handleVendorUpload(f, doc.key)}
+                                                />
+                                                {url && (
+                                                     <a href={url} target="_blank" className="text-[10px] text-[#0F3D3E] underline mt-1 block text-right">View Current</a>
+                                                )}
+                                             </div>
+                                        ) : (
+                                            url && (
+                                                <a 
+                                                    href={url} 
+                                                    target="_blank" 
+                                                    className="flex items-center gap-2 px-4 py-2 bg-[#0F3D3E] text-white rounded-lg text-xs font-bold hover:bg-[#0F3D3E]/90 transition-colors"
+                                                >
+                                                    <Download size={14} /> Download
+                                                </a>
+                                            )
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </Card>
+           )}
           </div>
           <div className="space-y-8">
              {/* Decision History is visible to everyone */}
