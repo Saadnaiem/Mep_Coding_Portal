@@ -42,7 +42,8 @@ import {
   CheckCircle,
   Layers,
   Download,
-  Briefcase
+  Briefcase,
+  Image as ImageIcon
 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { 
@@ -162,15 +163,15 @@ const App: React.FC = () => {
 
   // Load data from DB on mount
   useEffect(() => {
+    if (!isAuthenticated) return; // Prevent data leak: Only fetch if authenticated
+
     const fetchData = async () => {
        const reqs = await db.fetchRequests();
        setRequests(reqs);
        // Also fetch all products and actions initially so they are available for viewing
        const prods = await db.fetchProducts();
        setProducts(prods);
-       const acts = await db.fetchActions(''); // fetch all actions? or handle per request
-       // The fetchActions in db service currently takes requestId. We might need a 'fetchAllActions' or iterate.
-       // For now, let's just make sure we fetch actions when selecting a request or modify fetchActions.
+       // actions are fetched on demand per request usually, or could be fetched here
     };
     fetchData();
   }, [isAuthenticated]); 
@@ -205,7 +206,7 @@ const App: React.FC = () => {
   const [showEmailConfirmation, setShowEmailConfirmation] = useState(false);
 
   // App State
-  const [view, setView] = useState<'dashboard' | 'request_details' | 'new_request' | 'employee_inbox' | 'admin_staff' | 'preferences' | 'audit_log'>('dashboard');
+  const [view, setView] = useState<'dashboard' | 'request_details' | 'new_request' | 'employee_inbox' | 'admin_staff' | 'preferences' | 'audit_log' | 'reports' | 'vendor_profile' | 'reports' | 'vendor_profile'>('dashboard');
   const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => window.innerWidth > 1024);
   
@@ -252,6 +253,12 @@ const App: React.FC = () => {
   useEffect(() => {
     if (selectedRequestId && view === 'request_details') {
         const loadDetails = async () => {
+            // Fetch fresh request details to ensure Vendor Documents are up-to-date
+            const freshRequest = await db.fetchRequestById(selectedRequestId);
+            if (freshRequest) {
+                 setRequests(prev => prev.map(r => r.id === freshRequest.id ? freshRequest : r));
+            }
+
             const p = await db.fetchProducts(selectedRequestId);
             setProducts(p); // Update main products list
             
@@ -303,18 +310,24 @@ const App: React.FC = () => {
 
   const filteredRequests = useMemo(() => {
     return requests.filter(r => {
-      // Allow employees to see all requests for now, or filter by role logic if needed. 
-      // The requirement "appears for all employees in approval sequence" implies visibility.
-      // Current logic restricts employee view to "isOwner" which was intended for vendors.
-      // Let's separate vendor vs employee logic.
-
+      // Vendor Logic: Only show their own requests
       if (activePortal === 'vendor') {
          const isOwner = (currentVendor && r.vendor_id === currentVendor.id) || r.vendor_id === currentUserProfile?.id;
          if (!isOwner) return false;
       }
-      
-      // For employees, we might want to show everything or filter.
-      // Assuming all employees can see the dashboard of requests for now as "Main Hub".
+
+      // Employee Logic: Apply Division Visibility Rules
+      if (activePortal === 'employee') {
+         // If Category Manager, strict filter by assigned divisions
+         if (currentUserEmployee?.role === 'category_manager') {
+             // If no divisions assigned yet, safer to show nothing than everything
+             if (assignedDivisions.length === 0) return false;
+
+             const matchesDivision = assignedDivisions.some(d => d.toLowerCase() === r.category.toLowerCase());
+             if (!matchesDivision) return false;
+         }
+         // Other roles (Admin, Supply Chain, QC) currently see all requests in Dashboard
+      }
       
       const vendorName = r.vendor?.company_name || '';
       const matchesSearch = r.request_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -323,7 +336,7 @@ const App: React.FC = () => {
       const matchesStatus = statusFilter === 'all' || r.status === statusFilter;
       return matchesSearch && matchesStatus;
     });
-  }, [requests, searchQuery, statusFilter, activePortal, currentUserProfile, currentVendor]);
+  }, [requests, searchQuery, statusFilter, activePortal, currentUserProfile, currentVendor, currentUserEmployee, assignedDivisions]);
 
   const employeeInbox = useMemo(() => {
     if (activePortal !== 'employee') return [];
@@ -346,6 +359,30 @@ const App: React.FC = () => {
       return roleMatch && divisionMatch && r.status !== 'completed' && r.status !== 'rejected';
     });
   }, [requests, activePortal, currentUserEmployee, currentUserProfile, assignedDivisions]);
+
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    setRequests([]);
+    setProducts([]);
+    setActions([]);
+    setCurrentUserProfile(null);
+    setCurrentUserEmployee(null);
+    setCurrentVendor(null);
+    setAssignedDivisions([]);
+    setView('dashboard');
+    setSelectedRequestId(null);
+    setAuthForm({
+      email: '',
+      password: '',
+      fullName: '',
+      companyName: '',
+      vendorType: 'new',
+      phone: '',
+      username: '',
+      contactPerson: '',
+      mobile: ''
+    });
+  };
 
   // Auth Logic
   const handleAuthSubmit = async (e: React.FormEvent) => {
@@ -557,35 +594,64 @@ const App: React.FC = () => {
   const handleCreateRequest = async () => {
     setIsSaving(true);
 
-    let finalVendorId = currentUserProfile?.id;
+    let finalVendorId = currentVendor?.id || currentUserProfile?.id;
     let finalVendorObj = currentVendor;
 
     if (currentUserProfile?.role === 'vendor') {
-        if (!finalVendorObj) {
-             // Try fetching if not in state
-             finalVendorObj = await db.getVendorByContactId(currentUserProfile.id);
-             if (finalVendorObj) setCurrentVendor(finalVendorObj);
-        }
-
-        if (finalVendorObj) {
-            finalVendorId = finalVendorObj.id;
-            
-            // If New Vendor, Save Profile Updates
-            if (finalVendorObj.vendor_type === 'new' || newReqType === 'new_vendor') {
-                 // We rely on 'currentVendor' state being updated by the form in the Wizard
-                 // So 'finalVendorObj' holds the new values.
-                 // We must strip 'vendor_type' if strictly read-only, but usually fine.
-                 // Be careful: 'currentVendor' might map directly to state, so 'finalVendorObj' points to it.
-                 // Let's explicitly look at 'currentVendor' state to be sure we have the edits.
-                 if (currentVendor && currentVendor.id === finalVendorObj.id) {
-                     const { id, ...updates } = currentVendor;
-                     await db.updateVendor(id, updates);
-                 }
-            }
+         // 1. Resolve correct Vendor Record for this user
+         const existingDbVendor = await db.getVendorByContactId(currentUserProfile.id);
+         
+         if (existingDbVendor) {
+             finalVendorId = existingDbVendor.id;
+             // Update with latest form data if available
+             if (currentVendor && Object.keys(currentVendor).length > 0) {
+                  const { id, ...updates } = currentVendor;
+                  await db.updateVendor(finalVendorId, updates);
+                  finalVendorObj = { ...existingDbVendor, ...updates };
+             } else {
+                  finalVendorObj = existingDbVendor;
+             }
+         } else {
+             // 2. Create New Vendor Record if missing
+             const newVendorPayload = {
+                  company_name: currentVendor?.company_name || currentUserProfile.company_name || currentUserProfile.full_name || 'New Vendor',
+                  contact_person_id: currentUserProfile.id,
+                  vendor_type: 'new',
+                  email_address: currentUserProfile.email,
+                  contact_person_name: currentUserProfile.full_name,
+                  mobile: currentUserProfile.phone,
+                  ...(currentVendor || {}) 
+             };
+             // Ensure we don't pass an arbitrary ID
+             const { id, ...cleanPayload } = newVendorPayload as any; 
+             
+             console.log("Creating missing vendor record...", cleanPayload);
+             const newVendor = await db.createVendor(cleanPayload);
+             
+             if (newVendor) {
+                 finalVendorId = newVendor.id;
+                 finalVendorObj = newVendor;
+                 setCurrentVendor(newVendor);
+             } else {
+                 alert("Failed to create vendor profile (Database Error). Please try again or contact support.");
+                 setIsSaving(false);
+                 return;
+             }
+         }
+    } else {
+        // For Admins/others, if they haven't selected a vendor, ensure we don't send Profile ID as Vendor ID if it violates FK
+        if (!currentVendor?.id) {
+             // If Admin is submitting, maybe they are creating a request without a vendor assigned yet?
+             // Or they are the creator.
+             // If requestPayload.vendor_id is strictly FK to vendors, we valid UUID or NULL.
+             // Profile ID is valid UUID but not in vendors table.
+             // Better to set to NULL if no vendor selected.
+             finalVendorId = null; 
         } else {
-            console.error("Vendor record missing for user", currentUserProfile.id);
+             finalVendorId = currentVendor.id;
         }
     }
+
 
     // Generate ID format: HPL-YYYY-MM-XXX
     const now = new Date();
@@ -982,17 +1048,26 @@ const App: React.FC = () => {
     // Request Meta Data Table
     autoTable(doc, {
       startY: 75,
-      head: [['Field', 'Value', 'Field', 'Value']],
+      head: [['Metric', 'Detail', 'Metric', 'Detail']],
       body: [
-        ['Created Date', formatKSA(currentRequest.created_at), 'Vendor Name', currentRequest.vendor?.company_name || '-'],
+        ['Request ID', currentRequest.request_number, 'Created Date', formatKSA(currentRequest.created_at)],
         ['Status', currentRequest.status.replace(/_/g, ' ').toUpperCase(), 'Category', currentRequest.category || '-'],
-        ['Priority', currentRequest.priority?.toUpperCase(), 'Current Step', `${currentRequest.current_step} / 7`],
-        ['Total Products', requestProducts.length.toString(), 'Total Brands', uniqueBrands.length.toString()],
-        ['Brands List', uniqueBrands.join(', '), '', '']
+        ['Total Products', requestProducts.length.toString(), 'Current Step', `${currentRequest.current_step} / 7`],
+        
+        // Vendor & Contact Info
+        ['Vendor Name', currentRequest.vendor?.company_name || '-', 'Contact Person', currentRequest.vendor?.contact_person_name || '-'],
+        ['Contact Email', currentRequest.vendor?.email_address || '-', 'Contact Mobile', currentRequest.vendor?.mobile_number || '-'],
+        
+        // Brands
+        ['Total Brands', uniqueBrands.length.toString(), 'Brands List', uniqueBrands.join(', ')]
       ],
       theme: 'grid',
       headStyles: { fillColor: [15, 61, 62], textColor: 255, fontStyle: 'bold' },
-      styles: { fontSize: 9, cellPadding: 3 }
+      styles: { fontSize: 9, cellPadding: 4, valign: 'middle' },
+      columnStyles: {
+          0: { fontStyle: 'bold', cellWidth: 35, fillColor: [248, 250, 250], textColor: [15, 61, 62] },
+          2: { fontStyle: 'bold', cellWidth: 35, fillColor: [248, 250, 250], textColor: [15, 61, 62] }
+      }
     });
 
     // --- PAGE 2: APPROVAL SEQUENCE & HISTORY ---
@@ -1149,7 +1224,7 @@ const App: React.FC = () => {
         doc.setFontSize(8);
         doc.setFont("helvetica", "bold");
         doc.setTextColor(15, 61, 62);
-        doc.text("Cascading Hierarchy Selection", 22, yPos); 
+        doc.text("Product Hierarchy Selection", 22, yPos); 
         doc.setDrawColor(15, 61, 62);
         doc.setLineWidth(1);
         doc.line(15, yPos - 1, 20, yPos - 1); // Teal dash
@@ -1641,10 +1716,62 @@ const App: React.FC = () => {
               : currentUserProfile?.company_name || 'Vendor'}
           </span>
         </div>
-        <button onClick={() => setIsAuthenticated(false)} className="text-gray-400 hover:text-red-700 p-2 transition-colors"><LogOut size={20} className="md:w-6 md:h-6" /></button>
+        <button onClick={handleLogout} className="text-gray-400 hover:text-red-700 p-2 transition-colors"><LogOut size={20} className="md:w-6 md:h-6" /></button>
       </div>
     </header>
   );
+
+  const VendorProfile = () => {
+      const [editVendor, setEditVendor] = useState<Partial<Vendor>>({}); 
+      const [isSavingProfile, setIsSavingProfile] = useState(false);
+
+      useEffect(() => {
+          if (currentVendor) setEditVendor(currentVendor); 
+      }, [currentVendor]);
+
+      const handleSaveProfile = async () => {
+          if (!currentVendor?.id) return;
+          setIsSavingProfile(true);
+          try {
+             const success = await db.updateVendor(currentVendor.id, editVendor);
+             if (success) {
+                setCurrentVendor(prev => ({ ...prev, ...editVendor }));
+                alert('Company profile updated successfully.');
+             } else {
+                throw new Error('Update failed');
+             }
+          } catch(e: any) {
+             console.error(e);
+             alert('Failed to update profile. ' + e.message);
+          } finally {
+             setIsSavingProfile(false);
+          }
+      };
+
+      return (
+          <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
+             <header className="flex justify-between items-center">
+                 <div>
+                    <h1 className="text-3xl font-black font-serif text-[#0F3D3E]">Company Profile</h1>
+                    <p className="text-gray-500 mt-2">Manage your company details and compliance documents.</p>
+                 </div>
+                 <Button 
+                   className="h-12 px-8 rounded-xl bg-[#0F3D3E] text-white shadow-lg shadow-[#0F3D3E]/20 hover:scale-105 transition-all"
+                   onClick={handleSaveProfile}
+                   disabled={isSavingProfile}
+                 >
+                    {isSavingProfile ? <div className="animate-spin rounded-full h-4 w-4 border-2 border-white/30 border-t-white mr-2"></div> : <Save size={18} className="mr-2" />}
+                    {isSavingProfile ? 'Saving...' : 'Save Changes'}
+                 </Button>
+             </header>
+
+             <NewVendorForm 
+                 currentVendor={editVendor}
+                 onChange={(updates) => setEditVendor(prev => ({...prev, ...updates}))}
+             />
+          </div>
+      );
+  };
 
   const Dashboard = () => {
     const isInbox = view === 'employee_inbox';
@@ -1685,7 +1812,7 @@ const App: React.FC = () => {
                   <td className="py-6 px-8"><span className="text-[10px] font-bold bg-[#F0F4F4] text-[#0F3D3E] px-3 py-1.5 rounded-lg tracking-wide border border-transparent">{req.category}</span></td>
                   <td className="py-6 px-8"><Badge status={req.status} labelSuffix={req.status === 'in_review' ? MOCK_STEPS.find(s => s.step_number === req.current_step)?.step_name : undefined} /></td>
                   <td className="py-6 px-8 text-xs font-bold text-[#0F3D3E]/70">{formatKSA(req.created_at)}</td>
-                  <td className="py-6 px-8 text-right"><Button variant="ghost" className="hover:bg-[#C5A065]/10 hover:text-[#C5A065]" onClick={() => { setSelectedRequestId(req.id); setView('request_details'); }}><ChevronRight size={20} /></Button></td>
+                  <td className="py-6 px-8 text-right"><Button variant="ghost" className="hover:bg-[#C5A065]/10 hover:text-[#C5A065]" onClick={() => { setSelectedRequestId(req.id); setView('request_details'); }}><ChevronRight size={24} className="text-[#C5A065]" strokeWidth={3} /></Button></td>
                 </tr>
               )))}
             </tbody>
@@ -1709,7 +1836,7 @@ const App: React.FC = () => {
     return (
     <div className="max-w-6xl mx-auto space-y-10 animate-in fade-in slide-in-from-bottom-6 duration-700">
       <div className="flex items-center gap-6">
-        <button onClick={() => setView('dashboard')} className="p-3 bg-white shadow-sm border border-gray-100 rounded-xl text-gray-400 hover:text-[#0F3D3E] hover:border-[#C5A065] transition-all duration-300"><ArrowLeft size={24} /></button>
+        <button onClick={() => setView('dashboard')} className="p-3 bg-white shadow-sm border-2 border-[#C5A065]/20 rounded-xl text-[#C5A065] hover:text-[#0F3D3E] hover:border-[#0F3D3E] transition-all duration-300"><ArrowLeft size={24} strokeWidth={3} /></button>
         <div>
            <h2 className="text-4xl font-serif font-black text-[#0F3D3E] tracking-tight mb-2">New Request</h2>
            <p className="text-[#C5A065] text-sm font-bold tracking-wide">Initiate a new product listing request</p>
@@ -1724,7 +1851,7 @@ const App: React.FC = () => {
           <div className="space-y-10 p-4">
              {/* If user didn't register with a type, maybe allow switching here? For now assume locked */}
             <Select label="TARGET DIVISION" options={PRODUCT_HIERARCHY.map(d => d.name).filter(n => n !== "Grand Total")} value={newReqCategory} onChange={e => setNewReqCategory(e.target.value)} className="!py-4" />
-            <div className="flex justify-end pt-4"><Button className="h-14 px-12 rounded-xl text-lg shadow-xl shadow-[#0F3D3E]/10" onClick={() => setWizardStep(2)} disabled={!newReqCategory}>Proceed <ArrowRight size={22} /></Button></div>
+            <div className="flex justify-end pt-4"><Button className="h-14 px-12 rounded-xl text-lg shadow-xl shadow-[#0F3D3E]/10" onClick={() => setWizardStep(2)} disabled={!newReqCategory}>Proceed <ArrowRight size={22} strokeWidth={3} /></Button></div>
           </div>
         </Card>
       )}
@@ -1738,15 +1865,35 @@ const App: React.FC = () => {
             />
             <div className="flex justify-between items-center bg-white p-6 rounded-3xl shadow-lg border border-gray-100 mt-6 flex-wrap gap-4">
                 <Button variant="outline" className="h-12 px-10 rounded-xl" onClick={() => setWizardStep(1)}>
-                    <ArrowLeft size={18} /> Back
+                    <ArrowLeft size={18} strokeWidth={3} /> Back
                 </Button>
                 
                 <div className="flex items-center gap-4">
                     <Button variant="outline" className="h-12 px-6 rounded-xl border-[#C5A065] text-[#C5A065] hover:bg-[#C5A065]/10 font-bold" onClick={generateVendorRegistrationPDF}>
                         <FileText size={18} className="mr-2" /> Export Registration PDF
                     </Button>
-                    <Button className="h-12 px-10 rounded-xl bg-[#0F3D3E] text-white" onClick={() => setWizardStep(3)}>
-                        Next Step <ArrowRight size={20} className="ml-2" />
+                    <Button className="h-12 px-10 rounded-xl bg-[#0F3D3E] text-white" onClick={() => {
+                        const requiredFields = [
+                            'company_name', 'cr_number', 'cr_expiry_date', 'vat_number', 
+                            'country', 'city', 'address', 
+                            'contact_person_name', 'email_address', 'mobile_number',
+                            'invoice_currency', 'payment_currency', 'payment_terms', 'payment_method',
+                            'bank_name', 'swift_code', 'iban_number', 
+                            'bank_account_number', 'supplier_name_in_bank',
+                            'cr_document_url', 'vat_certificate_url', 'bank_certificate_url', 
+                            'guarantee_letter_url', 'listing_fees_document_url'
+                        ];
+                        
+                        const missing = requiredFields.filter(field => !currentVendor || !currentVendor[field]);
+                        
+                        if (missing.length > 0) {
+                            alert(`Please fill in all mandatory fields before proceeding. Missing: ${missing.map(f => f.replace(/_/g, ' ')).join(', ')}`);
+                            return;
+                        }
+                        
+                        setWizardStep(3);
+                    }}>
+                        Next Step <ArrowRight size={20} className="ml-2" strokeWidth={3} />
                     </Button>
                 </div>
             </div>
@@ -1777,8 +1924,8 @@ const App: React.FC = () => {
           </Card>
 
           <div className="flex justify-between items-center bg-white p-6 rounded-3xl shadow-lg border border-gray-100">
-            <Button variant="outline" className="h-12 px-10 rounded-xl border-gray-200 text-gray-500 hover:text-[#0F3D3E] hover:border-[#0F3D3E]" onClick={() => setWizardStep(needsRegistration ? 2 : 1)}><ArrowLeft size={18} /> Back</Button>
-            <Button className="h-14 px-16 rounded-xl bg-[#0F3D3E] text-white hover:bg-[#0F3D3E]/90 shadow-lg shadow-[#0F3D3E]/20" onClick={handleCreateRequest} disabled={newReqProducts.length === 0}>Submit Request <ArrowRight size={20} /></Button>
+            <Button variant="outline" className="h-12 px-10 rounded-xl border-gray-200 text-gray-500 hover:text-[#0F3D3E] hover:border-[#0F3D3E]" onClick={() => setWizardStep(needsRegistration ? 2 : 1)}><ArrowLeft size={18} strokeWidth={3} /> Back</Button>
+            <Button className="h-14 px-16 rounded-xl bg-[#0F3D3E] text-white hover:bg-[#0F3D3E]/90 shadow-lg shadow-[#0F3D3E]/20" onClick={handleCreateRequest} disabled={newReqProducts.length === 0}>Submit Request <ArrowRight size={20} strokeWidth={3} /></Button>
           </div>
         </div>
       )}
@@ -1833,6 +1980,56 @@ const App: React.FC = () => {
         } finally {
             setUploadingState(prev => ({ ...prev, [fieldName]: false }));
         }
+    };
+
+    const handleProductImageUpload = async (file: File | null, index: number, productId: string) => {
+        if (!file) return;
+
+        const fileExt = file.name.split('.').pop();
+        const fileName = `products/${Math.random().toString(36).substring(2)}_${Date.now()}.${fileExt}`;
+        const key = `${productId}-img-${index}`;
+
+        setUploadingState(prev => ({ ...prev, [key]: true }));
+
+        try {
+            const { error: uploadError } = await supabase.storage
+                .from('portal-uploads')
+                .upload(fileName, file);
+
+            if (uploadError) throw uploadError;
+
+            const { data: { publicUrl } } = supabase.storage
+                .from('portal-uploads')
+                .getPublicUrl(fileName);
+
+            setEditableProducts(prev => prev.map(p => {
+                if (p.id === productId) {
+                    const newImages = [...(p.images || Array(6).fill(''))];
+                    // Ensure it has 6 slots
+                    while (newImages.length < 6) newImages.push('');
+                    
+                    newImages[index] = publicUrl;
+                    return { ...p, images: newImages };
+                }
+                return p;
+            }));
+        } catch (error) {
+            console.error('Error uploading product image:', error);
+            alert('Error uploading image');
+        } finally {
+            setUploadingState(prev => ({ ...prev, [key]: false }));
+        }
+    };
+
+    const handleRemoveProductImage = (index: number, productId: string) => {
+         setEditableProducts(prev => prev.map(p => {
+                if (p.id === productId) {
+                    const newImages = [...(p.images || [])];
+                    newImages[index] = '';
+                    return { ...p, images: newImages };
+                }
+                return p;
+         }));
     };
 
     // Using shared 'editableProducts' from Parent (App) state now, so changes persist for Action saving
@@ -1933,7 +2130,7 @@ const App: React.FC = () => {
       )}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-gray-100 pb-8 gap-6 md:gap-0">
         <div className="flex items-center gap-4 md:gap-6 w-full">
-          <button onClick={() => setView('dashboard')} className="p-3 bg-white border border-gray-100 rounded-xl text-gray-400 hover:text-[#0F3D3E] hover:scale-105 transition-all"><ArrowLeft size={24} /></button>
+          <button onClick={() => setView('dashboard')} className="p-3 bg-white border-2 border-[#C5A065]/20 rounded-xl text-[#C5A065] hover:text-[#0F3D3E] hover:border-[#0F3D3E] hover:scale-105 transition-all"><ArrowLeft size={24} strokeWidth={3} /></button>
           <div className="flex-1">
             <h2 className="text-2xl md:text-4xl font-serif font-black text-[#0F3D3E] tracking-tight mb-2 break-all">{currentRequest?.request_number}</h2>
             <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
@@ -1985,10 +2182,10 @@ const App: React.FC = () => {
                         </div>
                       </div>
 
-                      {/* Cascading Hierarchy Selection */}
+                      {/* Product Hierarchy Selection */}
                       <div className="mb-10">
                         <h5 className="font-serif font-bold text-[#0F3D3E] text-sm uppercase tracking-widest mb-4 flex items-center gap-2">
-                            <span className="w-8 h-1 bg-[#0F3D3E] rounded-full"></span>Cascading Hierarchy Selection
+                            <span className="w-8 h-1 bg-[#0F3D3E] rounded-full"></span>Product Hierarchy Selection
                         </h5>
                         <div className="grid grid-cols-2 md:grid-cols-5 gap-4 bg-[#F0F4F4] p-6 rounded-2xl border border-gray-100">
                             {['division', 'department', 'category', 'sub_category', 'class_name'].map(field => (
@@ -2099,22 +2296,71 @@ const App: React.FC = () => {
                               {renderEditableField('Site Name / No', 'site_name', p)}
                            </div>
                         </div>
+                        
+                        {/* Product Images */}
+                        <div className="mt-8 pt-6 border-t border-gray-50">
+                             <h6 className="text-[10px] font-black text-[#C5A065] uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
+                                <ImageIcon size={14} /> Product Images
+                             </h6>
+                             <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
+                                {[0,1,2,3,4,5].map(idx => {
+                                    const images = (p.images && p.images.length > 0) ? p.images : Array(6).fill('');
+                                    const img = images[idx];
+                                    const loading = uploadingState[`${p.id}-img-${idx}`];
+                                    
+                                    return (
+                                        <div key={idx} className="relative group">
+                                            {img ? (
+                                                <div className="relative border border-gray-200 rounded-lg overflow-hidden h-24 flex items-center justify-center bg-gray-50">
+                                                    <img src={img} alt={`Product ${idx + 1}`} className="max-h-full max-w-full object-contain" />
+                                                    {isEditable && (
+                                                        <button 
+                                                            onClick={() => handleRemoveProductImage(idx, p.id)} 
+                                                            className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm z-10"
+                                                        >
+                                                            <X size={10} />
+                                                        </button>
+                                                    )}
+                                                    <a href={img} target="_blank" className="absolute inset-0 z-0" />
+                                                </div>
+                                            ) : (
+                                                isEditable ? (
+                                                    <FileInput 
+                                                        label={`Image ${idx + 1}`} 
+                                                        className="!py-2 !px-1 !text-[10px]" 
+                                                        loading={loading}
+                                                        onFileSelect={(f) => handleProductImageUpload(f, idx, p.id)}
+                                                        accept="image/*"
+                                                    />
+                                                ) : (
+                                                    <div className="h-24 border border-dashed border-gray-200 rounded-lg flex items-center justify-center bg-gray-50">
+                                                        <span className="text-[10px] text-gray-300 font-bold uppercase">No Image</span>
+                                                    </div>
+                                                )
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                             </div>
+                        </div>
                       </div>
                    </div>
                  ))}
                </div>
             </Card>
 
-            {/* Vendor Documents Card */}
-           {(activePortal === 'employee' || (activePortal === 'vendor' && currentVendor?.vendor_type === 'new')) && (
-                <Card title="Vendor Documents" className="bg-white shadow-sm border border-gray-100">
+            {/* Vendor Documents Card - Visible to all Staff and Vendors */}
+           {currentRequest?.vendor && (
+                <Card title="Vendor Compliance Documents & Attachments" className="bg-white shadow-sm border border-gray-100">
                     <div className="space-y-4">
                         {[
-                            { label: "CR Document", key: "cr_document_url" },
+                            { label: "Commercial Registration (CR)", key: "cr_document_url" },
                             { label: "VAT Certificate", key: "vat_certificate_url" },
                             { label: "Bank Certificate", key: "bank_certificate_url" },
-                            { label: "Product Catalog", key: "catalog_url" },
-                            { label: "Other Documents", key: "other_documents_url" },
+                            { label: "Product Catalog / Portfolio", key: "catalog_url" },
+                            { label: "Guarantee Letter", key: "guarantee_letter_url" },
+                            { label: "Non-Refundable Listing Fees", key: "listing_fees_document_url" },
+                            { label: "Other Supporting Documents", key: "other_documents_url" },
                         ].map((doc) => {
                             const targetVendor = activePortal === 'vendor' ? currentVendor : currentRequest?.vendor;
                             const isVendorEditing = activePortal === 'vendor' && isEditable;
@@ -2165,8 +2411,8 @@ const App: React.FC = () => {
            )}
           </div>
           <div className="space-y-8">
-             {/* Decision History is visible to everyone */}
-             <Card title="Decision History" className="bg-white shadow-sm border border-gray-100">
+             {/* Decision History is visible to everyone within the context of a Request */}
+             <Card title="Audit Log & Decision History" className="bg-white shadow-sm border border-gray-100">
                <div className="space-y-8 pl-2">
                  {actions.map(a => (
                    <div key={a.id} className="relative pl-8 border-l pb-2 border-[#C5A065]/30 last:border-0 last:pb-0">
@@ -2293,7 +2539,7 @@ const App: React.FC = () => {
                     <Input className="!py-3 !text-xs" label="Password" type="password" value={authForm.password} onChange={e => setAuthForm({...authForm, password: e.target.value})} placeholder="••••••••" required />
                 </div>
                 <Button type="submit" className="w-full h-14 text-sm rounded-xl bg-[#0F3D3E] hover:bg-[#0F3D3E]/90 shadow-xl text-white border-none mt-4 transition-transform hover:scale-[1.02]">
-                    {authMode === 'login' ? 'Access Vendor Portal' : 'Create Account'} <ArrowRight size={18} />
+                    {authMode === 'login' ? 'Access Vendor Portal' : 'Create Account'} <ArrowRight size={18} strokeWidth={3} />
                 </Button>
                 <div className="pt-4 border-t border-gray-100 text-center">
                     <button type="button" onClick={() => navigate('/staff')} className="px-6 py-3 rounded-xl bg-[#C5A065] text-white text-[10px] font-bold uppercase tracking-wider hover:bg-[#b08d55] transition-colors shadow-lg">Access Staff Portal Instead</button>
@@ -2346,7 +2592,7 @@ const App: React.FC = () => {
                  </div>
 
                  <Button type="submit" className="w-full h-14 text-sm rounded-xl bg-[#0F3D3E] hover:bg-[#0F3D3E]/90 shadow-xl text-white border-none mt-4 transition-transform hover:scale-[1.02]" >
-                    Sign In Securely <ArrowRight size={18} />
+                    Sign In Securely <ArrowRight size={18} strokeWidth={3} />
                  </Button>
 
                  <div className="pt-4 border-t border-gray-100 text-center">
@@ -2407,7 +2653,18 @@ const App: React.FC = () => {
       </div>
   );
 
-  const AuditLog = () => (
+  const AuditLog = () => {
+    // Current user's audit log
+    // MOVED LOGIC to render body to avoid React Hook Conditional Execution Error
+    let myActions = actions;
+    if (activePortal === 'vendor') {
+        const myRequestIds = requests
+            .filter(r => (currentVendor && r.vendor_id === currentVendor.id) || r.vendor_id === currentUserProfile?.id)
+            .map(r => r.id);
+        myActions = actions.filter(a => myRequestIds.includes(a.request_id));
+    }
+
+    return (
       <div className="space-y-10 animate-in fade-in duration-700">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-gray-100 pb-6 gap-4">
               <div>
@@ -2417,10 +2674,10 @@ const App: React.FC = () => {
           </div>
           <Card title="Recent Activity">
               <div className="space-y-4">
-                  {actions.length === 0 ? (
+                  {myActions.length === 0 ? (
                       <div className="text-center py-10 text-gray-400">No activity recorded yet</div>
                   ) : (
-                      actions.map(a => (
+                      myActions.map(a => (
                           <div key={a.id} className="p-4 border border-gray-100 rounded-xl hover:bg-[#F0F4F4] transition-colors">
                               <div className="flex justify-between items-start">
                                   <div>
@@ -2437,7 +2694,8 @@ const App: React.FC = () => {
               </div>
           </Card>
       </div>
-  );
+    );
+  };
 
   return (
     <div className="min-h-screen bg-[#fcfdfc] flex flex-col font-sans text-gray-900">
@@ -2459,6 +2717,7 @@ const App: React.FC = () => {
           <div className="p-4 md:p-6 flex flex-col gap-3">
             <p className={`px-4 text-[10px] font-black text-gray-300 uppercase tracking-widest ${!isSidebarOpen ? 'md:hidden' : ''}`}>General</p>
             <SidebarItem icon={LayoutDashboard} label="Main Hub" active={view === 'dashboard'} onClick={() => { setView('dashboard'); if(window.innerWidth < 768) setIsSidebarOpen(false); }} collapsed={!isSidebarOpen} />
+            {activePortal === 'vendor' && <SidebarItem icon={Building2} label="Company Profile" active={view === 'vendor_profile'} onClick={() => { setView('vendor_profile'); if(window.innerWidth < 768) setIsSidebarOpen(false); }} collapsed={!isSidebarOpen} />}
             {activePortal === 'employee' && <SidebarItem icon={Briefcase} label="Task Inbox" active={view === 'employee_inbox'} onClick={() => { setView('employee_inbox'); if(window.innerWidth < 768) setIsSidebarOpen(false); }} collapsed={!isSidebarOpen} />}
             {activePortal === 'employee' && currentUserEmployee?.role === 'super_admin' && (
               <>
@@ -2466,12 +2725,13 @@ const App: React.FC = () => {
                 <SidebarItem icon={FileText} label="Master Reports" active={view === 'reports'} onClick={() => { setView('reports'); if(window.innerWidth < 768) setIsSidebarOpen(false); }} collapsed={!isSidebarOpen} />
               </>
             )}
-            <SidebarItem icon={ClipboardList} label="Audit Log" active={view === 'audit_log'} onClick={() => { setView('audit_log'); if(window.innerWidth < 768) setIsSidebarOpen(false); }} collapsed={!isSidebarOpen} />
+            {activePortal === 'vendor' && <SidebarItem icon={ClipboardList} label="Audit Log" active={view === 'audit_log'} onClick={() => { setView('audit_log'); if(window.innerWidth < 768) setIsSidebarOpen(false); }} collapsed={!isSidebarOpen} />}
             <SidebarItem icon={Settings} label="Preferences" active={view === 'preferences'} onClick={() => { setView('preferences'); if(window.innerWidth < 768) setIsSidebarOpen(false); }} collapsed={!isSidebarOpen} />
           </div>
         </aside>
         <main className="flex-1 p-4 md:p-8 lg:p-14 overflow-y-auto h-[calc(100vh-6rem)] scroll-smooth w-full">
           {view === 'dashboard' && Dashboard()}
+          {view === 'vendor_profile' && <VendorProfile />}
           {view === 'request_details' && <RequestDetails />}
           {view === 'new_request' && NewRequestWizard()}
           {view === 'admin_staff' && <StaffManagement />}

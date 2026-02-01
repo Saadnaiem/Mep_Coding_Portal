@@ -28,6 +28,7 @@ interface ReportItem {
     sales_price: number;
     margin: number;
     status: string;
+    images?: string[];
 }
 
 export const Reports: React.FC = () => {
@@ -83,7 +84,8 @@ export const Reports: React.FC = () => {
                     cost_price: cost,
                     sales_price: retail,
                     margin: parseFloat(margin.toFixed(2)),
-                    status: req?.status || 'draft'
+                    status: req?.status || 'draft',
+                    images: p.images || []
                 };
             });
 
@@ -195,7 +197,8 @@ export const Reports: React.FC = () => {
             'POSSIBLE_SIDE_EFFECTS/WARNINGS_AR', 'Category', 'Group', 'Subgroup', 
             'Tags/Filters  (*Tags can be chosen based on the filters from column V to AG, with comma seprated*)', 
             'Suggested Filters in BEAUTY',
-            'Division', 'Department', 'Category (POP)', 'Sub-Category (POP)', 'Class'
+            'Division', 'Department', 'Category (POP)', 'Sub-Category (POP)', 'Class',
+            'Image 1', 'Image 2', 'Image 3', 'Image 4', 'Image 5', 'Image 6'
         ];
 
         const rows = dataToExport.map(item => {
@@ -214,6 +217,15 @@ export const Reports: React.FC = () => {
             row[24] = item.category;     // Category (POP)
             row[25] = item.sub_category; // Sub-Category (POP)
             row[26] = item.class_name;   // Class
+
+            // Images
+            if (item.images && item.images.length > 0) {
+                item.images.forEach((img, idx) => {
+                    if (idx < 6) {
+                        row[27 + idx] = img;
+                    }
+                });
+            }
 
             return row;
         });

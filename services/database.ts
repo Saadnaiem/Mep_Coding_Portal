@@ -130,14 +130,20 @@ class DatabaseService {
 
   // --- Actions / History ---
   async fetchActions(requestId: string): Promise<StepAction[]> {
-    const { data, error } = await supabase
+    let query = supabase
       .from('request_history')
       .select(`
         *,
         actor:profiles(full_name, role)
       `)
-      .eq('request_id', requestId)
       .order('created_at', { ascending: false });
+    
+    // Only filter if requestId is provided
+    if (requestId) {
+        query = query.eq('request_id', requestId);
+    }
+
+    const { data, error } = await query;
 
     if (error) return [];
     
@@ -233,10 +239,25 @@ class DatabaseService {
       .from('vendors')
       .select('*')
       .eq('contact_person_id', userId)
-      .single();
+      .maybeSingle();
     
+    // Use maybeSingle to suppress error on 406/Not Found
     if (error) {
       console.error('Error fetching vendor:', error);
+      return null;
+    }
+    return data;
+  }
+
+  async createVendor(vendor: Partial<any>): Promise<any | null> {
+    const { data, error } = await supabase
+      .from('vendors')
+      .insert(vendor)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating vendor:', error);
       return null;
     }
     return data;

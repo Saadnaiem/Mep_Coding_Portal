@@ -81,6 +81,8 @@ export interface Vendor {
   bank_certificate_url?: string;
   catalog_url?: string;
   other_documents_url?: string;
+  guarantee_letter_url?: string;
+  listing_fees_document_url?: string;
 }
 
 export interface ProductRequest {
@@ -148,6 +150,7 @@ export interface Product {
   item_sub_group?: string;
   taxable?: boolean;
   margin?: number;
+  images?: string[];
 }
 
 export interface StepAction {

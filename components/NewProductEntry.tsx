@@ -1,9 +1,10 @@
 
 import React, { useState, useMemo, useCallback } from 'react';
-import { Layers, Plus } from 'lucide-react';
-import { Card, Input, Select, Button } from './UI'; // Assuming UI.tsx is in the same folder
+import { Layers, Plus, X, Image as ImageIcon, Download } from 'lucide-react';
+import { Card, Input, Select, Button, FileInput } from './UI'; // Assuming UI.tsx is in the same folder
 import { PRODUCT_HIERARCHY } from '../services/mockDb';
 import { Product } from '../types';
+import { supabase } from '../services/supabase';
 
 interface NewProductEntryProps {
   onAddProduct: (product: Product) => void;
@@ -53,6 +54,57 @@ export const NewProductEntry: React.FC<NewProductEntryProps> = ({ onAddProduct, 
     taxable: 'No',
     erp_item_code: ''
   });
+
+  const [productImages, setProductImages] = useState<string[]>(Array(6).fill(''));
+  const [uploadingImages, setUploadingImages] = useState<boolean[]>(Array(6).fill(false));
+
+  const handleImageUpload = async (file: File | null, index: number) => {
+      if (!file) return;
+
+      const fileExt = file.name.split('.').pop();
+      const fileName = `products/${Math.random().toString(36).substring(2)}_${Date.now()}.${fileExt}`;
+
+      setUploadingImages(prev => {
+          const newArr = [...prev];
+          newArr[index] = true;
+          return newArr;
+      });
+
+      try {
+          const { error: uploadError } = await supabase.storage
+            .from('portal-uploads')
+            .upload(fileName, file);
+
+          if (uploadError) throw uploadError;
+
+          const { data: { publicUrl } } = supabase.storage
+            .from('portal-uploads')
+            .getPublicUrl(fileName);
+
+          setProductImages(prev => {
+              const newArr = [...prev];
+              newArr[index] = publicUrl;
+              return newArr;
+          });
+      } catch (error) {
+          console.error("Upload error", error);
+          alert("Failed to upload image");
+      } finally {
+          setUploadingImages(prev => {
+            const newArr = [...prev];
+            newArr[index] = false;
+            return newArr;
+          });
+      }
+  };
+
+  const removeImage = (index: number) => {
+      setProductImages(prev => {
+          const newArr = [...prev];
+          newArr[index] = '';
+          return newArr;
+      });
+  };
 
   // Cascade Logic
   const divisions = useMemo(() => PRODUCT_HIERARCHY.map(d => d.name).filter(n => n !== "Grand Total"), []);
@@ -163,12 +215,14 @@ export const NewProductEntry: React.FC<NewProductEntryProps> = ({ onAddProduct, 
       item_sub_group: productForm.item_sub_group,
       margin: (productForm.cost && productForm.retail && parseFloat(productForm.retail) > 0) 
             ? parseFloat(((1 - (parseFloat(productForm.cost) / parseFloat(productForm.retail))) * 100).toFixed(2)) 
-            : 0
+            : 0,
+      images: productImages.filter(url => url !== '')
     };
 
     onAddProduct(newProduct);
 
     // Reset Form (keep hierarchy and some fields?)
+    setProductImages(Array(6).fill(''));
     setProductForm({ 
         ...productForm, 
         name: '', 
@@ -185,7 +239,7 @@ export const NewProductEntry: React.FC<NewProductEntryProps> = ({ onAddProduct, 
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 zoom-in-95 duration-500">
-        <Card title="Cascading Hierarchy Selection" className="border-t-4 border-t-[#0F3D3E]">
+        <Card title="Product Hierarchy Selection" className="border-t-4 border-t-[#0F3D3E]">
              <div className="grid grid-cols-1 md:grid-cols-5 gap-4 p-4 bg-[#F0F4F4] rounded-2xl border border-gray-100 shadow-inner">
                <Select label="Division" name="division" options={divisions} value={productForm.division} onChange={handleHierarchyChange} />
                <Select label="Department" name="department" options={departments} value={productForm.department} onChange={handleHierarchyChange} disabled={!productForm.division} />
@@ -195,7 +249,7 @@ export const NewProductEntry: React.FC<NewProductEntryProps> = ({ onAddProduct, 
              </div>
         </Card>
 
-        <Card title="Pharmacy Listing Specifications" className="border-t-4 border-t-[#C5A065]">
+        <Card title="Product Listing Specifications" className="border-t-4 border-t-[#C5A065]">
              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="space-y-6">
                   <h4 className="font-serif font-bold text-[#0F3D3E] text-sm uppercase tracking-widest mb-4 border-b border-[#C5A065]/30 pb-2">Basic Information</h4>
@@ -271,10 +325,81 @@ export const NewProductEntry: React.FC<NewProductEntryProps> = ({ onAddProduct, 
                   <div className="pt-4">
                      <Input label="Buyer (Optional)" name="buyer" placeholder="Name" value={productForm.buyer} onChange={handleFieldChange} />
                   </div>
-
-                  <div className="pt-6"><Button className="w-full h-14 rounded-xl font-bold uppercase tracking-widest bg-[#0F3D3E] hover:bg-[#C5A065] text-white shadow-xl transition-all duration-300" onClick={handleAddToManifest}>Add Product to Manifest <Plus size={20} /></Button></div>
                 </div>
              </div>
+
+             <div className="pt-6 border-t border-gray-100 mt-6">
+                 <h5 className="font-serif font-bold text-[#0F3D3E] text-sm uppercase tracking-widest mb-4 flex items-center gap-2">
+                    <ImageIcon size={18} /> Product Images (Max 6)
+                 </h5>
+                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                    {productImages.map((img, idx) => (
+                       <div key={idx} className="flex flex-col gap-2">
+                          {/* Uniform Label outside the container */}
+                          <label className="block text-[10px] font-serif font-bold text-[#0F3D3E]/70 uppercase tracking-widest ml-1">
+                             Image {idx + 1}
+                          </label>
+
+                          {img ? (
+                              <div className="relative border border-gray-200 rounded-xl overflow-hidden h-40 bg-white shadow-sm group hover:shadow-md transition-all">
+                                  <img src={img} alt={`Product ${idx + 1}`} className="w-full h-full object-contain p-2" />
+                                  
+                                  {/* Overlay Actions */}
+                                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors flex items-start justify-end p-2 gap-2">
+                                      <a 
+                                        href={img} 
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="bg-white/90 text-[#0F3D3E] rounded-full p-2 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm hover:scale-110"
+                                        title="Download/View Full Size"
+                                      >
+                                          <Download size={14} />
+                                      </a>
+                                      <button 
+                                        onClick={() => removeImage(idx)} 
+                                        className="bg-red-500 text-white rounded-full p-2 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm hover:scale-110"
+                                        title="Remove Image"
+                                      >
+                                          <X size={14} />
+                                      </button>
+                                  </div>
+
+                                  {/* Alt Text / Footer */}
+                                  <div className="absolute bottom-0 inset-x-0 bg-white/90 border-t border-gray-100 p-1 text-center">
+                                      <p className="text-[9px] text-gray-400 font-mono truncate">{img.split('/').pop()?.split('?')[0] || `image-0${idx+1}.jpg`}</p>
+                                  </div>
+                              </div>
+                          ) : (
+                              <div className={`relative border-2 border-dashed border-gray-200 rounded-xl h-40 flex flex-col items-center justify-center bg-[#F0F4F4]/30 hover:bg-white hover:border-[#C5A065] transition-all duration-300 group cursor-pointer ${uploadingImages[idx] ? 'opacity-50 cursor-wait' : ''}`}>
+                                <input 
+                                    type="file" 
+                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
+                                    disabled={uploadingImages[idx]}
+                                    onChange={(e) => handleImageUpload(e.target.files ? e.target.files[0] : null, idx)}
+                                    accept="image/*"
+                                 />
+                                 <div className="flex flex-col items-center gap-2 group-hover:scale-105 transition-transform duration-300">
+                                    <div className="p-3 bg-white rounded-full shadow-sm text-[#0F3D3E] group-hover:text-[#C5A065] transition-colors border border-gray-50">
+                                        {uploadingImages[idx] ? (
+                                            <div className="animate-spin rounded-full h-5 w-5 border-2 border-[#0F3D3E] border-t-transparent"></div>
+                                        ) : (
+                                            <Plus size={20} />
+                                        )}
+                                    </div>
+                                    <div className="text-center">
+                                        <span className="block text-[10px] font-bold text-[#0F3D3E] uppercase tracking-widest group-hover:text-[#C5A065]">
+                                            {uploadingImages[idx] ? 'Uploading...' : 'Upload Image'}
+                                        </span>
+                                    </div>
+                                 </div>
+                              </div>
+                          )}
+                       </div>
+                    ))}
+                 </div>
+              </div>
+
+             <div className="pt-6"><Button className="w-full h-14 rounded-xl font-bold uppercase tracking-widest bg-[#0F3D3E] hover:bg-[#C5A065] text-white shadow-xl transition-all duration-300" onClick={handleAddToManifest}>Add Product to Manifest <Plus size={20} /></Button></div>
         </Card>
     </div>
   );

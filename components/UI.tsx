@@ -46,7 +46,7 @@ export const Badge: React.FC<{ status: RequestStatus; labelSuffix?: string }> = 
   );
 };
 
-export const Input: React.FC<React.InputHTMLAttributes<HTMLInputElement> & { label?: string; error?: string }> = ({ label, error, className = '', ...props }) => {
+export const Input: React.FC<React.InputHTMLAttributes<HTMLInputElement> & { label?: string; error?: string }> = ({ label, error, className = '', required, ...props }) => {
   // Use autoFocus only if the input is meant to grab attention initially, 
   // but for lists of inputs, we avoid aggressively stealing focus on re-render.
   // We use a ref to maintain focus if this is a controlled component being re-rendered.
@@ -61,10 +61,16 @@ export const Input: React.FC<React.InputHTMLAttributes<HTMLInputElement> & { lab
 
   return (
   <div className="w-full group">
-    {label && <label className="block text-[11px] font-serif font-bold text-[#0F3D3E]/70 uppercase tracking-widest mb-2 ml-1 transition-colors group-hover:text-[#C5A065]">{label}</label>}
+    {label && (
+      <label className="block text-[11px] font-serif font-bold text-[#0F3D3E]/70 uppercase tracking-widest mb-2 ml-1 transition-colors group-hover:text-[#C5A065]">
+        {label}
+        {required && <span className="text-red-500 ml-1" title="Required">*</span>}
+      </label>
+    )}
     <input 
       ref={inputRef}
       className={`w-full px-5 py-3.5 rounded-lg border border-gray-200 bg-white focus:ring-4 focus:ring-[#C5A065]/10 focus:border-[#C5A065] outline-none transition-all duration-300 placeholder:text-gray-300 text-sm font-medium text-[#0F3D3E] shadow-sm hover:border-gray-300 ${error ? 'border-red-500' : ''} ${className}`} 
+      required={required}
       {...props} 
     />
     {error && <p className="text-red-600 text-[10px] mt-1.5 ml-1 font-serif">{error}</p>}
@@ -72,11 +78,17 @@ export const Input: React.FC<React.InputHTMLAttributes<HTMLInputElement> & { lab
   );
 };
 
-export const Select: React.FC<React.SelectHTMLAttributes<HTMLSelectElement> & { label?: string; options: string[]; error?: string }> = React.memo(({ label, options, error, className = '', ...props }) => (
+export const Select: React.FC<React.SelectHTMLAttributes<HTMLSelectElement> & { label?: string; options: string[]; error?: string }> = React.memo(({ label, options, error, className = '', required, ...props }) => (
   <div className="w-full group">
-    {label && <label className="block text-[11px] font-serif font-bold text-[#0F3D3E]/70 uppercase tracking-widest mb-2 ml-1 transition-colors group-hover:text-[#C5A065]">{label}</label>}
+    {label && (
+      <label className="block text-[11px] font-serif font-bold text-[#0F3D3E]/70 uppercase tracking-widest mb-2 ml-1 transition-colors group-hover:text-[#C5A065]">
+        {label}
+        {required && <span className="text-red-500 ml-1" title="Required">*</span>}
+      </label>
+    )}
     <select 
       className={`w-full px-5 py-3.5 rounded-lg border border-gray-200 bg-white focus:ring-4 focus:ring-[#C5A065]/10 focus:border-[#C5A065] outline-none transition-all duration-300 text-sm font-medium text-[#0F3D3E] shadow-sm hover:border-gray-300 appearance-none ${error ? 'border-red-500' : ''} ${className}`} 
+      required={required}
       {...props}
     >
       <option value="" className="text-gray-300">Select Option</option>
@@ -86,10 +98,13 @@ export const Select: React.FC<React.SelectHTMLAttributes<HTMLSelectElement> & { 
   </div>
 ));
 
-export const FileInput: React.FC<React.InputHTMLAttributes<HTMLInputElement> & { label: string; onFileSelect?: (file: File | null) => void; loading?: boolean }> = ({ label, onFileSelect, loading, className = '', ...props }) => {
+export const FileInput: React.FC<React.InputHTMLAttributes<HTMLInputElement> & { label: string; onFileSelect?: (file: File | null) => void; loading?: boolean }> = ({ label, onFileSelect, loading, className = '', required, ...props }) => {
   return (
     <div className="w-full group">
-      <label className="block text-[11px] font-serif font-bold text-[#0F3D3E]/70 uppercase tracking-widest mb-2 ml-1 transition-colors group-hover:text-[#C5A065]">{label}</label>
+      <label className="block text-[11px] font-serif font-bold text-[#0F3D3E]/70 uppercase tracking-widest mb-2 ml-1 transition-colors group-hover:text-[#C5A065]">
+        {label}
+        {required && <span className="text-red-500 ml-1" title="Required">*</span>}
+      </label>
       <div className={`relative flex items-center w-full px-5 py-3.5 rounded-lg border border-gray-200 bg-gray-50 hover:bg-white transition-all duration-300 hover:border-gray-300 ${loading ? 'opacity-70 cursor-wait' : ''}`}>
         <input 
           type="file" 
