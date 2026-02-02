@@ -568,6 +568,16 @@ const App: React.FC = () => {
     
     await db.logAction(newActionPayload);
 
+    // Email Notification Trigger
+    const vendorEmail = currentRequest.vendor?.email_address;
+    if (vendorEmail) {
+        const subject = `Request Update - ${currentRequest.request_number}`;
+        const body = `Dear Partner,\n\nYour request (${currentRequest.request_number}) has been updated.\n\nNew Status: ${nextStatus.toUpperCase().replace(/_/g, ' ')}\nAction: ${actionType.toUpperCase()}\nComment: ${actionComment}\n\nPlease login to the portal to view details.\n\nBest Regards,\nAl Habib Pharmacy Team`;
+        
+        // Open default mail client
+        window.open(`mailto:${vendorEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`);
+    }
+
     // Optimistic UI Update
     const newActionDisplay = { ...newActionPayload, id: `temp-${Date.now()}`, actor_name: currentUserProfile?.full_name || 'Me' };
     setActions([newActionDisplay as any, ...actions]);
@@ -2704,14 +2714,14 @@ const App: React.FC = () => {
         {/* Mobile Overlay */}
         {isSidebarOpen && (
           <div 
-            className="fixed inset-0 bg-black/50 z-30 md:hidden backdrop-blur-sm transition-opacity"
+            className="fixed inset-0 bg-black/50 z-30 md:hidden backdrop-blur-sm transition-opacity top-24"
             onClick={() => setIsSidebarOpen(false)}
           />
         )}
         
         <aside className={`
-            fixed inset-y-0 left-0 z-40 bg-white border-r border-gray-100 flex flex-col transition-all duration-300
-            h-full md:sticky md:top-24 md:h-[calc(100vh-6rem)]
+            fixed top-24 bottom-0 left-0 z-40 bg-white border-r border-gray-100 flex flex-col transition-all duration-300 overflow-y-auto
+            md:sticky md:top-60 md:h-[calc(100vh-15rem)] md:bottom-auto
             ${isSidebarOpen ? 'translate-x-0 w-80 shadow-2xl md:shadow-none' : '-translate-x-full md:translate-x-0 w-80 md:w-24'}
         `}>
           <div className="p-4 md:p-6 flex flex-col gap-3">
