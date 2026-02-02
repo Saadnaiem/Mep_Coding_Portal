@@ -43,4 +43,5 @@ export const ROLE_LABELS: Record<EmployeeRole, string> = {
   general_director: 'General Director',
   planning_erp_creation: 'Planning - ERP Creation',
   super_admin: 'Super Admin',
+  e_commerce_admin: 'E-commerce Admin',
 };

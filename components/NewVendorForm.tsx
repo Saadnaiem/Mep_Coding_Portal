@@ -8,9 +8,10 @@ import { Save, CheckCircle } from 'lucide-react';
 interface NewVendorFormProps {
   currentVendor: Partial<Vendor>;
   onChange: (updates: Partial<Vendor>) => void;
+  userRole?: string;
 }
 
-export const NewVendorForm: React.FC<NewVendorFormProps> = ({ currentVendor, onChange }) => {
+export const NewVendorForm: React.FC<NewVendorFormProps> = ({ currentVendor, onChange, userRole }) => {
   // Use local state for immediate feedback
   const [localForm, setLocalForm] = useState<Partial<Vendor>>(currentVendor || {});
   const [hasInitialized, setHasInitialized] = useState(false);
@@ -89,15 +90,25 @@ export const NewVendorForm: React.FC<NewVendorFormProps> = ({ currentVendor, onC
                  {/* Basic Info */}
                  <h4 className="font-serif font-bold text-[#0F3D3E] text-sm uppercase tracking-widest mb-4 border-b border-[#C5A065]/30 pb-2">Company Information</h4>
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <Input label="Supplier Name (Legal)" required value={getValue('company_name')} onChange={e => handleChange('company_name', e.target.value)} />
-                    <Input label="CR Number" required value={getValue('cr_number')} onChange={e => handleChange('cr_number', e.target.value)} />
-                    <Input label="CR Expiry Date" required type="date" value={getValue('cr_expiry_date')} onChange={e => handleChange('cr_expiry_date', e.target.value)} />
-                    <Input label="VAT Number" required value={getValue('vat_number')} onChange={e => handleChange('vat_number', e.target.value)} />
-                    <Input label="Country" required value={getValue('country')} onChange={e => handleChange('country', e.target.value)} />
-                    <Input label="City" required value={getValue('city')} onChange={e => handleChange('city', e.target.value)} />
+                    <Input label="Supplier Name (Legal)" value={getValue('company_name')} onChange={e => handleChange('company_name', e.target.value)} />
+                    <Input label="CR Number" value={getValue('cr_number')} onChange={e => handleChange('cr_number', e.target.value)} />
+                    <Input label="CR Expiry Date" type="date" value={getValue('cr_expiry_date')} onChange={e => handleChange('cr_expiry_date', e.target.value)} />
+                    <Input label="VAT Number" value={getValue('vat_number')} onChange={e => handleChange('vat_number', e.target.value)} />
+                    <Input label="Country" value={getValue('country')} onChange={e => handleChange('country', e.target.value)} />
+                    <Input label="City" value={getValue('city')} onChange={e => handleChange('city', e.target.value)} />
                     <div className="md:col-span-2">
-                         <Input label="Full Address" required value={getValue('address')} onChange={e => handleChange('address', e.target.value)} />
+                         <Input label="Full Address" value={getValue('address')} onChange={e => handleChange('address', e.target.value)} />
                     </div>
+                    
+                    {/* New Vendor Registration Fees */}
+                    <Input 
+                        label="New Vendor Registration Fees" 
+                        required={userRole === 'category_manager'} 
+                        value={getValue('new_vendor_registration_fees')} 
+                        onChange={e => handleChange('new_vendor_registration_fees', e.target.value)} 
+                        placeholder={userRole === 'category_manager' ? "Required" : "Optional"}
+                    />
+
                  </div>
 
                  {/* Contact Info */}
@@ -113,19 +124,19 @@ export const NewVendorForm: React.FC<NewVendorFormProps> = ({ currentVendor, onC
                  {/* Financials */}
                  <h4 className="font-serif font-bold text-[#0F3D3E] text-sm uppercase tracking-widest mb-4 border-b border-[#C5A065]/30 pb-2 pt-4">Financial & Banking</h4>
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <Select label="Invoice Currency" required options={['SAR', 'USD', 'EUR', 'GBP']} value={localForm.invoice_currency || 'SAR'} onChange={e => handleChange('invoice_currency', e.target.value)} />
-                    <Select label="Payment Currency" required options={['SAR', 'USD', 'EUR', 'GBP']} value={localForm.payment_currency || 'SAR'} onChange={e => handleChange('payment_currency', e.target.value)} />
-                    <Input label="Payment Terms" required placeholder="e.g 60 Days" value={getValue('payment_terms')} onChange={e => handleChange('payment_terms', e.target.value)} />
-                    <Select label="Payment Method" required options={['Bank Transfer', 'Check', 'Cash']} value={getValue('payment_method')} onChange={e => handleChange('payment_method', e.target.value)} />
+                    <Select label="Invoice Currency" options={['SAR', 'USD', 'EUR', 'GBP']} value={localForm.invoice_currency || 'SAR'} onChange={e => handleChange('invoice_currency', e.target.value)} />
+                    <Select label="Payment Currency" options={['SAR', 'USD', 'EUR', 'GBP']} value={localForm.payment_currency || 'SAR'} onChange={e => handleChange('payment_currency', e.target.value)} />
+                    <Input label="Payment Terms" placeholder="e.g 60 Days" value={getValue('payment_terms')} onChange={e => handleChange('payment_terms', e.target.value)} />
+                    <Select label="Payment Method" options={['Bank Transfer', 'Check', 'Cash']} value={getValue('payment_method')} onChange={e => handleChange('payment_method', e.target.value)} />
                     
-                    <Input label="Bank Name" required value={getValue('bank_name')} onChange={e => handleChange('bank_name', e.target.value)} />
+                    <Input label="Bank Name" value={getValue('bank_name')} onChange={e => handleChange('bank_name', e.target.value)} />
                     <Input label="Branch" value={getValue('bank_branch')} onChange={e => handleChange('bank_branch', e.target.value)} />
                     <Input label="Branch Address" value={getValue('branch_address')} onChange={e => handleChange('branch_address', e.target.value)} />
-                    <Input label="Swift Code" required value={getValue('swift_code')} onChange={e => handleChange('swift_code', e.target.value)} />
-                    <Input label="IBAN Number" required value={getValue('iban_number')} onChange={e => handleChange('iban_number', e.target.value)} />
-                    <Input label="Bank Account Number" required value={getValue('bank_account_number')} onChange={e => handleChange('bank_account_number', e.target.value)} />
+                    <Input label="Swift Code" value={getValue('swift_code')} onChange={e => handleChange('swift_code', e.target.value)} />
+                    <Input label="IBAN Number" value={getValue('iban_number')} onChange={e => handleChange('iban_number', e.target.value)} />
+                    <Input label="Bank Account Number" value={getValue('bank_account_number')} onChange={e => handleChange('bank_account_number', e.target.value)} />
                     <div className="md:col-span-2">
-                        <Input label="Supplier Name in Bank Account" required value={getValue('supplier_name_in_bank')} onChange={e => handleChange('supplier_name_in_bank', e.target.value)} />
+                        <Input label="Supplier Name in Bank Account" value={getValue('supplier_name_in_bank')} onChange={e => handleChange('supplier_name_in_bank', e.target.value)} />
                     </div>
                  </div>
 

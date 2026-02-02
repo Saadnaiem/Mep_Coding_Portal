@@ -12,7 +12,8 @@ export type EmployeeRole =
   | 'exec_director' 
   | 'general_director' 
   | 'planning_erp_creation' 
-  | 'super_admin';
+  | 'super_admin'
+  | 'e_commerce_admin';
 export type ActionType = 'submit' | 'approve' | 'reject' | 'return' | 'comment' | 'upload';
 
 export interface Profile {
@@ -83,6 +84,9 @@ export interface Vendor {
   other_documents_url?: string;
   guarantee_letter_url?: string;
   listing_fees_document_url?: string;
+  
+  // New Fees
+  new_vendor_registration_fees?: string;
 }
 
 export interface ProductRequest {
@@ -150,6 +154,8 @@ export interface Product {
   item_sub_group?: string;
   taxable?: boolean;
   margin?: number;
+  // New Fees
+  product_listing_fees?: string;
   images?: string[];
 }
 

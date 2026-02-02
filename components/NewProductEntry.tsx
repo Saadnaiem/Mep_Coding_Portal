@@ -52,7 +52,10 @@ export const NewProductEntry: React.FC<NewProductEntryProps> = ({ onAddProduct, 
     buyer: '',
     currency: 'SAR',
     taxable: 'No',
-    erp_item_code: ''
+    erp_item_code: '',
+    
+    // New Fees
+    product_listing_fees: ''
   });
 
   const [productImages, setProductImages] = useState<string[]>(Array(6).fill(''));
@@ -153,10 +156,16 @@ export const NewProductEntry: React.FC<NewProductEntryProps> = ({ onAddProduct, 
   }, []);
 
   const handleAddToManifest = () => {
-    // Define optional fields to exclude from validation
-    const optionalFields = ['item_group', 'item_sub_group', 'erp_item_code', 'category_manager', 'buyer', 'invoice_extra_discount', 'vendor_no', 'primary_warehouse', 'vendor_name'];
+    // Validation: Only First Image is mandatory per user request
+    const firstImage = productImages[0];
+    if (!firstImage || firstImage.trim() === '') {
+        alert("Please upload at least the first image (Image 1) to proceed.");
+        return;
+    }
     
-    // Validate all other fields
+    /*
+    // Previous validation logic disabled
+    const optionalFields = ['item_group', 'item_sub_group', 'erp_item_code', 'category_manager', 'buyer', 'invoice_extra_discount', 'vendor_no', 'primary_warehouse', 'vendor_name', 'product_listing_fees'];
     const missingFields = Object.keys(productForm)
       .filter(key => !optionalFields.includes(key))
       .filter(key => {
@@ -168,6 +177,7 @@ export const NewProductEntry: React.FC<NewProductEntryProps> = ({ onAddProduct, 
       alert(`Please fill in the following mandatory fields: ${missingFields.map(f => f.replace(/_/g, ' ')).join(', ')}`);
       return;
     }
+    */
     
     const newProduct: Product = {
       id: `p-${Date.now()}`,
@@ -211,6 +221,7 @@ export const NewProductEntry: React.FC<NewProductEntryProps> = ({ onAddProduct, 
       currency: productForm.currency,
       taxable: productForm.taxable === 'Yes',
       erp_item_code: productForm.erp_item_code,
+      product_listing_fees: productForm.product_listing_fees,
       item_group: productForm.item_group,
       item_sub_group: productForm.item_sub_group,
       margin: (productForm.cost && productForm.retail && parseFloat(productForm.retail) > 0) 
@@ -324,6 +335,7 @@ export const NewProductEntry: React.FC<NewProductEntryProps> = ({ onAddProduct, 
                   </div>
                   <div className="pt-4">
                      <Input label="Buyer (Optional)" name="buyer" placeholder="Name" value={productForm.buyer} onChange={handleFieldChange} />
+                     <Input label="Product Listing Fees (Optional)" name="product_listing_fees" placeholder="Annual or One-time Fee" value={productForm.product_listing_fees} onChange={handleFieldChange} />
                   </div>
                 </div>
              </div>
@@ -337,7 +349,7 @@ export const NewProductEntry: React.FC<NewProductEntryProps> = ({ onAddProduct, 
                        <div key={idx} className="flex flex-col gap-2">
                           {/* Uniform Label outside the container */}
                           <label className="block text-[10px] font-serif font-bold text-[#0F3D3E]/70 uppercase tracking-widest ml-1">
-                             Image {idx + 1}
+                             Image {idx + 1} {idx === 0 && <span className="text-red-500">*</span>}
                           </label>
 
                           {img ? (
