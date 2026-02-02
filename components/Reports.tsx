@@ -287,7 +287,49 @@ export const Reports: React.FC = () => {
             </Card>
 
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                <div className="overflow-x-auto">
+                {/* Mobile Cards */}
+                <div className="md:hidden flex flex-col divide-y divide-gray-100">
+                    {filteredData.length === 0 ? (
+                        <div className="p-8 text-center text-gray-400">No matching records found.</div>
+                    ) : (
+                        filteredData.map(item => (
+                            <div key={item.id} className="p-4 bg-white">
+                                 <div className="flex justify-between items-start mb-2">
+                                    <span className="text-[10px] font-mono text-gray-400 font-bold">{new Date(item.created_at).toLocaleDateString()}</span>
+                                    <span className={`text-[9px] uppercase font-bold tracking-wider px-2 py-0.5 rounded border ${item.vendor_type === 'new' ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-purple-50 text-purple-600 border-purple-100'}`}>
+                                        {item.vendor_type === 'new' ? 'New Vendor' : 'Existing'}
+                                    </span>
+                                 </div>
+                                 <h4 className="font-bold text-[#0F3D3E] text-sm mb-0.5 leading-snug">{item.description_en}</h4>
+                                 <p className="font-serif text-xs text-gray-500 mb-3" dir="rtl">{item.description_ar}</p>
+                                 
+                                 <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs mb-3 border-b border-gray-50 pb-3">
+                                    <div className="flex flex-col"><span className="text-[9px] text-gray-400 uppercase tracking-wider">Brand</span> <span className="font-bold text-[#0F3D3E]">{item.brand}</span></div>
+                                    <div className="flex flex-col"><span className="text-[9px] text-gray-400 uppercase tracking-wider">Category</span> <span className="font-bold text-[#0F3D3E] truncate">{item.division}</span></div>
+                                 </div>
+                                 
+                                 <div className="bg-[#F0F4F4] p-3 rounded-lg text-xs space-y-2 border border-blue-100/30">
+                                    <div className="flex justify-between items-end border-b border-gray-200 pb-2">
+                                        <div className="flex flex-col">
+                                            <span className="text-[9px] text-gray-400">Vendor</span>
+                                            <span className="font-bold text-[#0F3D3E]">{item.vendor_name}</span>
+                                        </div>
+                                        <div className="flex flex-col items-end">
+                                            <span className="text-[9px] text-gray-400">Margin</span>
+                                            <span className={`font-black ${item.margin < 20 ? 'text-red-600' : 'text-green-600'}`}>{item.margin.toFixed(1)}%</span>
+                                        </div>
+                                    </div>
+                                    <div className="flex justify-between text-[10px] font-mono pt-1">
+                                        <span className="text-gray-500">Cost: <b className="text-[#0F3D3E]">{item.cost_price}</b></span>
+                                        <span className="text-gray-500">Retail: <b className="text-[#0F3D3E]">{item.sales_price}</b></span>
+                                    </div>
+                                 </div>
+                            </div>
+                        ))
+                    )}
+                </div>
+
+                <div className="hidden md:block overflow-x-auto">
                     <table className="w-full text-left">
                         <thead className="bg-[#Fdfbf7] border-b border-gray-100">
                             <tr>

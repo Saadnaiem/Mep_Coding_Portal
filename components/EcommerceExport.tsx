@@ -254,16 +254,16 @@ export const EcommerceExport: React.FC = () => {
 
     return (
         <div className="space-y-8 animate-in fade-in duration-700">
-             <div className="flex justify-between items-center border-b border-gray-100 pb-6">
+             <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-gray-100 pb-6 gap-4">
                 <div>
                    <h2 className="text-3xl font-serif font-black text-[#0F3D3E] tracking-tight mb-2">E-Commerce Data Master</h2>
                    <p className="text-[#C5A065] text-sm font-bold tracking-wide">Sync Completed Products with Online Store</p>
                 </div>
-                <div className="flex gap-3">
-                    <Button onClick={handleExportAll} className="bg-white border-2 border-[#0F3D3E] text-[#0F3D3E] hover:bg-gray-50 h-12 px-6 rounded-xl shadow-lg">
+                <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
+                    <Button onClick={handleExportAll} className="bg-white border-2 border-[#0F3D3E] text-[#0F3D3E] hover:bg-gray-50 h-12 px-6 rounded-xl shadow-lg w-full md:w-auto">
                         <FileDown size={20} className="mr-2" /> Download All (Tracking)
                     </Button>
-                    <Button onClick={handleExport} className="bg-[#0F3D3E] text-white hover:bg-[#0F3D3E]/90 h-12 px-6 rounded-xl shadow-lg">
+                    <Button onClick={handleExport} className="bg-[#0F3D3E] text-white hover:bg-[#0F3D3E]/90 h-12 px-6 rounded-xl shadow-lg w-full md:w-auto">
                         <FileDown size={20} className="mr-2" /> Download Master (Ready)
                     </Button>
                 </div>
@@ -281,11 +281,48 @@ export const EcommerceExport: React.FC = () => {
                 />
              </div>
 
-             <Card title="All In-Progress & Completed Products" className="border-t-4 border-gray-200">
+             <Card title="All In-Progress & Completed Products" className="border-t-4 border-gray-200" noPadding>
                  {isLoading ? (
                      <div className="p-10 text-center text-gray-400">Loading master data...</div>
                  ) : (
-                     <div className="overflow-x-auto">
+                    <>
+                     {/* Mobile Card View */}
+                     <div className="md:hidden flex flex-col divide-y divide-gray-100">
+                        {filteredProducts.length === 0 ? (
+                            <div className="p-8 text-center text-gray-400">No products found.</div>
+                        ) : (
+                            filteredProducts.map((p, i) => (
+                                <div key={i} className="p-4 bg-white">
+                                    <div className="flex justify-between items-start mb-2">
+                                        <div className="flex flex-col">
+                                            <span className="font-bold text-[#0F3D3E] text-sm">{p.erp_item_code || <span className="text-amber-500 text-xs">Pending Code</span>}</span>
+                                            <span className="text-[10px] text-gray-400 font-mono tracking-widest">{p.request_number}</span>
+                                        </div>
+                                        <div className="text-xs text-right opacity-80 scale-90 origin-top-right">
+                                            {getWaitingStatus(p)}
+                                        </div>
+                                    </div>
+                                    
+                                    <h4 className="font-serif font-bold text-[#0F3D3E] mb-0.5 leading-tight">{p.product_name}</h4>
+                                    <p className="text-[10px] text-gray-500 mb-3">{p.brand} &bull; {p.product_name_ar}</p>
+                                    
+                                    <div className="bg-[#F0F4F4] p-3 rounded-lg text-xs space-y-2 border border-blue-100/50">
+                                        <div className="flex items-center gap-2">
+                                            <User size={12} className="text-orange-500" /> 
+                                            <span className="font-bold text-[#0F3D3E]">{p.vendor_contact_person || 'N/A'}</span>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-2 text-[10px]">
+                                            <div className="flex items-center gap-1 text-emerald-600 truncate"><Mail size={10} /> {p.vendor_email}</div>
+                                            <div className="flex items-center gap-1 text-blue-600 truncate"><Phone size={10} /> {p.vendor_mobile}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                     </div>
+
+                     {/* Desktop Table View */}
+                     <div className="hidden md:block overflow-x-auto p-4">
                          <table className="w-full text-left text-sm">
                              <thead className="sticky top-0 bg-gray-50 z-10">
                                  <tr className="border-b border-gray-100 text-[#0F3D3E]">
@@ -326,14 +363,46 @@ export const EcommerceExport: React.FC = () => {
                              </tbody>
                          </table>
                      </div>
+                    </>
                  )}
              </Card>
 
-             <Card title="Ready for E-Commerce (With Item Code)" className="border-t-4 border-t-[#0F3D3E] !mt-12">
+             <Card title="Ready for E-Commerce (With Item Code)" className="border-t-4 border-t-[#0F3D3E] !mt-12" noPadding>
                  {isLoading ? (
                      <div className="p-10 text-center text-gray-400">Filtering ready products...</div>
                  ) : (
-                     <div className="overflow-x-auto">
+                    <>
+                     {/* Mobile Card View */}
+                     <div className="md:hidden flex flex-col divide-y divide-emerald-50">
+                        {completedProductsWithCode.length === 0 ? (
+                             <div className="p-8 text-center text-gray-400">No products with Item Codes found.</div>
+                        ) : (
+                             completedProductsWithCode.map(p => (
+                                 <div key={p.id} className="p-4 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-emerald-50/50 via-transparent to-transparent">
+                                     <div className="flex justify-between items-center mb-2">
+                                          <div className="flex items-center gap-2">
+                                              <div className="p-1.5 bg-emerald-100 rounded text-emerald-800">
+                                                  <FileDown size={14} />
+                                              </div>
+                                              <span className="font-mono font-black text-emerald-900 text-lg tracking-tight">{p.erp_item_code}</span>
+                                          </div>
+                                          <span className="text-[9px] font-bold text-emerald-600 uppercase bg-emerald-50 px-2 py-1 rounded-full border border-emerald-100">Ready to Sync</span>
+                                     </div>
+                                     
+                                     <h4 className="font-serif font-bold text-[#0F3D3E] leading-tight mb-1">{p.product_name}</h4>
+                                     <p className="text-[10px] text-gray-400 mb-3">{p.product_name_ar} &bull; {p.brand}</p>
+                                     
+                                     <div className="flex items-center gap-2 text-[10px] text-gray-500 bg-white p-2 rounded border border-gray-100 shadow-sm">
+                                        <User size={12} className="text-orange-400" />
+                                        <span>Point of Contact: <span className="font-bold text-[#0F3D3E]">{p.vendor_contact_person}</span></span>
+                                     </div>
+                                 </div>
+                             ))
+                        )}
+                     </div>
+
+                     {/* Desktop Table View */}
+                     <div className="hidden md:block overflow-x-auto p-4">
                          <table className="w-full text-left text-sm">
                              <thead>
                                  <tr className="bg-emerald-50 border-b border-emerald-100 text-[#0F3D3E]">
@@ -370,6 +439,7 @@ export const EcommerceExport: React.FC = () => {
                              </tbody>
                          </table>
                      </div>
+                    </>
                  )}
              </Card>
         </div>

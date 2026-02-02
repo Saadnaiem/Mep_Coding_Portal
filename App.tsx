@@ -1717,17 +1717,17 @@ const App: React.FC = () => {
   };
 
   const Header = () => (
-    <header className="h-24 md:h-60 bg-white border-b border-[#C5A065]/20 flex items-center justify-between px-4 md:px-10 sticky top-0 z-50 shadow-sm/50 backdrop-blur-md bg-white/95">
+    <header className="h-20 md:h-60 bg-white border-b border-[#C5A065]/20 flex items-center justify-between px-4 md:px-10 sticky top-0 z-50 shadow-sm/50 backdrop-blur-md bg-white/95">
       <div className="flex items-center gap-3 md:gap-8">
         <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2.5 hover:bg-[#F0F4F4] rounded-xl transition-all text-[#0F3D3E]">
           <Menu size={24} className="md:w-7 md:h-7" />
         </button>
         <div className="flex items-center gap-3 md:gap-5 cursor-pointer group" onClick={() => setView('dashboard')}>
-          <div className="w-16 h-16 md:w-72 md:h-56 flex items-center justify-center transition-all duration-500 group-hover:scale-105">
+          <div className="w-12 h-12 md:w-72 md:h-56 flex items-center justify-center transition-all duration-500 group-hover:scale-105">
              <img src="/logo.png" alt="MEP Logo" className="w-full h-full object-contain drop-shadow-sm" />
           </div>
           <div className="flex flex-col justify-center h-full pt-1 md:pt-2">
-            <h1 className="font-sans font-bold text-lg md:text-4xl tracking-tight text-[#0F3D3E] leading-none mb-1 md:mb-2">MEP Coding Portal</h1>
+            <h1 className="font-sans font-bold text-base md:text-4xl tracking-tight text-[#0F3D3E] leading-none mb-1 md:mb-2">MEP Coding Portal</h1>
             <h2 className="text-[9px] md:text-[11px] font-bold text-[#C5A065] uppercase tracking-[0.05em]">Al Habib Pharmacy</h2>
           </div>
         </div>
@@ -1816,7 +1816,39 @@ const App: React.FC = () => {
         {activePortal === 'vendor' && <Button onClick={() => setView('new_request')} className="w-full md:w-auto px-8 h-12 shadow-lg shadow-[#0F3D3E]/20 hover:scale-105"><Plus size={20} />New Request</Button>}
       </div>
       <Card title={isInbox ? "Your Action Items" : "Request Pipeline"} noPadding className="border-t-4 border-t-[#C5A065]">
-        <div className="overflow-x-auto">
+        {/* Mobile View: Cards */}
+        <div className="md:hidden flex flex-col divide-y divide-gray-100">
+            {displayRequests.length === 0 ? (
+                <div className="py-12 text-center text-gray-400 font-medium italic">No requests found.</div>
+            ) : (
+                displayRequests.map(req => (
+                    <div key={req.id} className="p-4 hover:bg-[#F0F4F4]/50 active:bg-[#F0F4F4] transition-colors cursor-pointer" onClick={() => { setSelectedRequestId(req.id); setView('request_details'); }}>
+                        <div className="flex justify-between items-start mb-3">
+                             <div>
+                                 <div className="flex items-center gap-2">
+                                    <p className="font-bold text-[#0F3D3E] font-serif text-base">{req.request_number}</p>
+                                    <span className="text-[9px] font-bold bg-[#F0F4F4] text-[#0F3D3E] px-2 py-0.5 rounded border border-gray-200">{req.category}</span>
+                                 </div>
+                                 <p className="text-xs text-gray-500 font-medium mt-1 line-clamp-1">{req.vendor?.company_name}</p>
+                             </div>
+                        </div>
+                        
+                        <div className="flex justify-between items-end">
+                             <div className="flex flex-col gap-2">
+                                 <Badge status={req.status} labelSuffix={req.status === 'in_review' ? MOCK_STEPS.find(s => s.step_number === req.current_step)?.step_name : undefined} />
+                                 <span className="text-[10px] text-gray-400 font-bold tracking-wider">{formatKSA(req.created_at)}</span>
+                             </div>
+                             <div className="h-8 w-8 flex items-center justify-center rounded-full bg-[#C5A065]/10 text-[#C5A065]">
+                                 <ChevronRight size={16} strokeWidth={3} />
+                             </div>
+                        </div>
+                    </div>
+                ))
+            )}
+        </div>
+
+        {/* Desktop View: Table */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left">
             <thead>
               <tr className="bg-[#Fdfbf7] border-b border-gray-100">
@@ -2573,7 +2605,7 @@ const App: React.FC = () => {
             <div className="inline-flex items-center justify-center w-28 h-28 bg-white rounded-[2rem] shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] mb-8 ring-4 ring-[#C5A065] ring-offset-4 ring-offset-[#0F3D3E]">
               <img src="/logo.png" alt="Logo" className="w-16 h-16 object-contain" />
             </div>
-            <h1 className="text-5xl font-serif font-black text-white tracking-tight mb-3 drop-shadow-lg">Vendor Portal</h1>
+            <h1 className="text-3xl md:text-5xl font-serif font-black text-white tracking-tight mb-3 drop-shadow-lg">Vendor Portal</h1>
             <p className="text-[#C5A065] font-bold uppercase tracking-[0.3em] text-[10px] text-shadow-sm flex items-center justify-center gap-4">
               <span className="w-6 h-[2px] bg-[#C5A065] opacity-50"></span>
               Al Habib Pharmacy
@@ -2664,7 +2696,7 @@ const App: React.FC = () => {
             <div className="inline-flex items-center justify-center w-28 h-28 bg-white rounded-[2rem] shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] mb-8 ring-4 ring-[#C5A065] ring-offset-4 ring-offset-[#0F3D3E]">
                <img src="/logo.png" alt="Al Habib Logo" className="w-16 h-16 object-contain" />
             </div>
-            <h1 className="text-5xl font-serif font-black text-white tracking-tight mb-3 drop-shadow-lg">Staff Portal</h1>
+            <h1 className="text-3xl md:text-5xl font-serif font-black text-white tracking-tight mb-3 drop-shadow-lg">Staff Portal</h1>
             <p className="text-[#C5A065] font-bold uppercase tracking-[0.3em] text-[10px] text-shadow-sm flex items-center justify-center gap-4">
               <span className="w-6 h-[2px] bg-[#C5A065] opacity-50"></span>
               Internal Access Only
