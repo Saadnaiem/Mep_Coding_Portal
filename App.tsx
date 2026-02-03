@@ -1820,82 +1820,6 @@ Al Habib Pharmacy Team`;
         */
     }
 
-    // --- APPROVAL SEQUENCE & HISTORY PAGE ---
-    doc.addPage();
-    const hPageW = doc.internal.pageSize.width;
-    let hY = 40; // Start content below header
-
-    // Header Bar
-    doc.setFillColor(15, 61, 62); 
-    doc.rect(0, 15, hPageW, 14, 'F');
-    
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(14);
-    doc.setTextColor(255, 255, 255);
-    doc.text("APPROVAL SEQUENCE & HISTORY", 15, 24);
-    
-    doc.setDrawColor(197, 160, 101); // Gold
-    doc.setLineWidth(0.8);
-    doc.line(0, 29, hPageW, 29);
-
-    // Table Header
-    doc.setFillColor(240, 244, 244); // Light Teal
-    doc.rect(15, hY, hPageW - 30, 10, 'F');
-    doc.setFontSize(9);
-    doc.setTextColor(15, 61, 62); // Teal Text
-    doc.setFont("helvetica", "bold");
-    doc.text("ACTION / STEP", 20, hY + 6.5);
-    doc.text("PERFORMED BY", 80, hY + 6.5);
-    doc.text("TIMESTAMP", 140, hY + 6.5);
-    hY += 12;
-
-    // History Rows
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-
-    if (actions && actions.length > 0) {
-        actions.forEach((a) => {
-            // Check page break - Conservative limit (297 - 35 = 262)
-            if (hY > 262) { 
-                doc.addPage(); 
-                hY = 25; // Reset Y
-                // Optional: valid to redraw header here if needed, but keeping simple for now
-            }
-            
-            const dateStr = new Date(a.action_at).toLocaleString('en-US', { 
-                day: '2-digit', month: 'short', year: 'numeric', 
-                hour: '2-digit', minute: '2-digit' 
-            });
-
-            doc.setTextColor(0);
-            doc.text(a.action.toUpperCase(), 20, hY);
-            doc.text(a.actor_name || 'System', 80, hY);
-            doc.text(dateStr, 140, hY);
-            
-            hY += 5;
-            if (a.comment) {
-                doc.setFontSize(8);
-                doc.setTextColor(100);
-                doc.setFont("helvetica", "italic");
-                const splitComment = doc.splitTextToSize(`"${a.comment}"`, hPageW - 50);
-                doc.text(splitComment, 25, hY);
-                hY += (splitComment.length * 4) + 4;
-                doc.setFont("helvetica", "normal");
-                doc.setFontSize(9);
-            } else {
-                hY += 4;
-            }
-
-            // Separator
-            doc.setDrawColor(240);
-            doc.line(15, hY - 2, hPageW - 15, hY - 2);
-            hY += 4;
-        });
-    } else {
-        doc.setTextColor(150);
-        doc.text("No history available for this request.", 20, hY);
-    }
-    
     // --- Post-Processing: Headers & Footers (Logo on ALL Pages) ---
     const totalPages = doc.getNumberOfPages();
     const timestamp = new Date().toLocaleString('en-US', { 
@@ -1933,11 +1857,12 @@ Al Habib Pharmacy Team`;
         doc.setFont("helvetica", "bold");
         doc.setFontSize(8);
         doc.setTextColor(15, 61, 62); // Teal
-        doc.text("AL HABIB PHARMACY CODING PORTAL", 15, footerY);
+        doc.text("AL HABIB PHARMACY CODING PORTAL", 15, footerY - 1);
         
-        doc.setFont("helvetica", "normal");
-        doc.setTextColor(120);
-        doc.text(" | Al Habib Pharmacy", 15 + doc.getTextWidth("AL HABIB PHARMACY CODING PORTAL"), footerY);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(7);
+        doc.setTextColor(197, 160, 101); // Gold
+        doc.text("Middle East Pharmacies Company (MEPCO)", 15, footerY + 3);
 
         // Center: Timestamp
         doc.setFontSize(7);

@@ -306,32 +306,34 @@ export const EcommerceExport: React.FC = () => {
     };
 
     return (
-        <div className="space-y-8 animate-in fade-in duration-700">
-             <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-gray-100 pb-6 gap-4">
-                <div>
-                   <h2 className="text-3xl font-serif font-black text-[#0F3D3E] tracking-tight mb-2">E-Commerce Data Master</h2>
-                   <p className="text-[#C5A065] text-sm font-bold tracking-wide">Sync Completed Products with Online Store</p>
+        <div className="animate-in fade-in duration-700">
+             <div className="sticky top-20 md:top-60 z-30 bg-[#fcfdfc]/95 backdrop-blur-md border-b border-gray-200/60 pb-6 pt-2 mb-8 -mx-4 px-4 md:-mx-8 md:px-8 lg:-mx-14 lg:px-14 transition-all duration-300">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
+                    <div>
+                       <h2 className="text-3xl font-serif font-black text-[#0F3D3E] tracking-tight mb-2">E-Commerce Data Master</h2>
+                       <p className="text-[#C5A065] text-sm font-bold tracking-wide">Sync Completed Products with Online Store</p>
+                    </div>
+                    <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
+                        <Button onClick={handleExportAll} className="bg-white border-2 border-[#0F3D3E] text-[#0F3D3E] hover:bg-gray-50 h-12 px-6 rounded-xl shadow-lg w-full md:w-auto">
+                            <FileDown size={20} className="mr-2" /> Download All (Tracking)
+                        </Button>
+                        <Button onClick={handleExport} className="bg-[#0F3D3E] text-white hover:bg-[#0F3D3E]/90 h-12 px-6 rounded-xl shadow-lg w-full md:w-auto">
+                            <FileDown size={20} className="mr-2" /> Download Master (Ready)
+                        </Button>
+                    </div>
                 </div>
-                <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
-                    <Button onClick={handleExportAll} className="bg-white border-2 border-[#0F3D3E] text-[#0F3D3E] hover:bg-gray-50 h-12 px-6 rounded-xl shadow-lg w-full md:w-auto">
-                        <FileDown size={20} className="mr-2" /> Download All (Tracking)
-                    </Button>
-                    <Button onClick={handleExport} className="bg-[#0F3D3E] text-white hover:bg-[#0F3D3E]/90 h-12 px-6 rounded-xl shadow-lg w-full md:w-auto">
-                        <FileDown size={20} className="mr-2" /> Download Master (Ready)
-                    </Button>
-                </div>
-             </div>
 
-             {/* Search Filter */}
-             <div className="relative w-full md:w-96">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#0F3D3E]/50" size={16} />
-                <input 
-                    type="text" 
-                    placeholder="Filter by Request #, Item Code, Product, Brand..." 
-                    className="w-full pl-10 pr-4 py-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0F3D3E]/20 text-sm font-medium text-[#0F3D3E] shadow-sm transition-all"
-                    value={searchTerm}
-                    onChange={e => setSearchTerm(e.target.value)}
-                />
+                {/* Search Filter */}
+                <div className="relative w-full md:w-96">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#0F3D3E]/50" size={16} />
+                    <input 
+                        type="text" 
+                        placeholder="Filter by Request #, Item Code, Product, Brand..." 
+                        className="w-full pl-10 pr-4 py-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0F3D3E]/20 text-sm font-medium text-[#0F3D3E] shadow-sm transition-all"
+                        value={searchTerm}
+                        onChange={e => setSearchTerm(e.target.value)}
+                    />
+                </div>
              </div>
 
              <Card title="All In-Progress & Completed Products" className="border-t-4 border-gray-200" noPadding>
