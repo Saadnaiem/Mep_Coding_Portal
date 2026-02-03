@@ -675,24 +675,92 @@ const App: React.FC = () => {
     
     await db.logAction(newActionPayload);
 
-    // Email Notification Trigger
-    const vendorEmail = currentRequest.vendor?.email_address;
-    if (vendorEmail) {
-        const subject = `Request Update - ${currentRequest.request_number}`;
-        
-        let statusDisplay = nextStatus.toUpperCase().replace(/_/g, ' ');
-        if (nextStatus === 'in_review') {
-             const step = MOCK_STEPS.find(s => s.step_number === nextStep);
-             if (step) {
-                 const roleTitle = step.step_name.replace(/ Approval$/i, '').replace(/ Issuance$/i, '');
-                 statusDisplay = `WAITING APPROVAL FROM ${roleTitle.toUpperCase()}`;
-             }
-        }
+    // --- NOTIFICATION LOGIC ---
+    
+    // 1. Notify Next Approver (Employee) - Primary Notification on Approval
+    if (actionType === 'approve' && nextStatus === 'in_review') {
+         const nextStepDef = MOCK_STEPS.find(s => s.step_number === nextStep);
+         if (nextStepDef) {
+             let approverEmails: string[] = [];
+             
+             // Special case for Step 2 (Purchasing Manager) or other roles
+             const employees = await db.fetchEmployeesByRole(nextStepDef.role_required);
+             approverEmails = employees.map(e => e.email).filter(Boolean);
+             
+             if (approverEmails.length > 0) {
+                 const subject = `Action Required: Request ${currentRequest.request_number} - ${nextStepDef.step_name}`;
+                 
+                 const reqProducts = products.filter(p => p.request_id === currentRequest.id);
+                 const uniqueBrands = Array.from(new Set(reqProducts.map(p => p.brand))).filter(Boolean);
+                 
+                 const body = `Dear Colleague,
 
-        const body = `Dear ${currentRequest.vendor?.company_name || 'Partner'},\n\nYour request (${currentRequest.request_number}) has been updated.\n\nAction: ${actionType.toUpperCase()}\nComment: ${actionComment}\nNew Status: ${statusDisplay}\n\nPlease login to the portal to view details.\n\nBest Regards,\nAl Habib Pharmacy Team`;
-        
-        // Open default mail client
-        window.open(`mailto:${vendorEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`);
+A request requires your approval.
+
+--- REQUEST OVERVIEW ---
+Request ID:      ${currentRequest.request_number}
+Pending Step:    ${nextStepDef.step_name}
+Category:        ${currentRequest.category}
+Sub-Category:    ${reqProducts[0]?.sub_category || '-'}
+
+--- VENDOR DETAILS ---
+Vendor Name:     ${currentRequest.vendor?.company_name || 'N/A'}
+Contact Person:  ${currentRequest.vendor?.contact_person_name || 'N/A'}
+Mobile:          ${currentRequest.vendor?.mobile || '-'}
+Email:           ${currentRequest.vendor?.email_address || '-'}
+
+--- PRODUCT SUMMARY ---
+Total Products:  ${reqProducts.length}
+Total Brands:    ${uniqueBrands.length}
+Brand Names:     ${uniqueBrands.join(', ') || 'N/A'}
+
+Please login to the portal to review and take action.
+
+Best Regards,
+Al Habib Pharmacy Team`;
+                 
+                 // Open mail client for Next Approver
+                 setTimeout(() => {
+                     window.open(`mailto:${approverEmails.join(';')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`);
+                 }, 0);
+             }
+         }
+    } 
+    // 2. Notify Vendor - Only on Rejection, Return, or if not Approving (to avoid double popups)
+    else {
+        const vendorEmail = currentRequest.vendor?.email_address;
+        if (vendorEmail) {
+            const subject = `Request Update - ${currentRequest.request_number}`;
+            let statusDisplay = nextStatus.toUpperCase().replace(/_/g, ' ');
+
+            // Calculate Product Summary for Vendor too
+            const reqProducts = products.filter(p => p.request_id === currentRequest.id);
+            const uniqueBrands = Array.from(new Set(reqProducts.map(p => p.brand))).filter(Boolean);
+
+            const body = `Dear ${currentRequest.vendor?.company_name || 'Partner'},
+
+Your request has been updated.
+
+--- STATUS UPDATE ---
+Request ID:      ${currentRequest.request_number}
+New Status:      ${statusDisplay}
+Action Taken:    ${actionType.toUpperCase()}
+Review Comment:  "${actionComment}"
+
+--- PRODUCT SUMMARY ---
+Total Products:  ${reqProducts.length}
+Total Brands:    ${uniqueBrands.length}
+
+Please login to the portal to view full details and take necessary actions if required.
+
+Best Regards,
+Al Habib Pharmacy Team`;
+            
+            // Open default mail client
+            setTimeout(() => {
+                window.open(`mailto:${vendorEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`);
+            }, 0);
+        }
     }
 
     // Optimistic UI Update
@@ -841,10 +909,46 @@ const App: React.FC = () => {
 
         setRequests([requestWithVendor, ...requests]);
         
-        // OLD LOGIC WAS: setProducts([...products, ...productsToSave as any]); 
-        // This is risky because productsToSave don't have IDs.
+        // Notify Category Manager (Step 1)
+        try {
+            const manager = await getCategoryManagerForDivision(newReqCategory);
+             if (manager && manager.email) {
+                 const uniqueBrands = Array.from(new Set(newReqProducts.map(p => p.brand))).filter(Boolean);
+                 
+                 const subject = `New Request Submitted: ${savedRequest.request_number || 'Pending'} - ${newReqCategory}`;
+                 const body = `Dear ${manager.full_name},
 
-        
+A new product listing request has been submitted.
+
+--- REQUEST OVERVIEW ---
+Request ID:      ${savedRequest.request_number}
+Category:        ${newReqCategory}
+Priority:        ${newReqPriority}
+
+--- VENDOR DETAILS ---
+Vendor Name:     ${finalVendorObj?.company_name || currentUserProfile?.company_name || 'N/A'}
+Contact Person:  ${finalVendorObj?.contact_person_name || currentUserProfile?.full_name || 'N/A'}
+Mobile:          ${finalVendorObj?.mobile || currentUserProfile?.phone || '-'}
+Email:           ${finalVendorObj?.email_address || currentUserProfile?.email || '-'}
+
+--- PRODUCT SUMMARY ---
+Total Products:  ${newReqProducts.length}
+Total Brands:    ${uniqueBrands.length}
+Brand Names:     ${uniqueBrands.join(', ') || 'N/A'}
+
+Please login to the portal to review the request.
+
+Best Regards,
+Al Habib Pharmacy Team`;
+                 
+                 setTimeout(() => {
+                    window.open(`mailto:${manager.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`);
+                 }, 500);
+             }
+        } catch (e) {
+            console.warn("Failed to notify manager", e);
+        }
+
         setTimeout(() => { 
             setIsSaving(false); 
             setView('dashboard'); 

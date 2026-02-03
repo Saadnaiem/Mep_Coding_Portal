@@ -325,6 +325,20 @@ class DatabaseService {
       }
       return data;
   }
+  
+  async fetchEmployeesByRole(role: string): Promise<Profile[]> {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('role', role);
+      
+      if (error) {
+          console.error('Error fetching employees by role:', error);
+          return [];
+      }
+      return data || [];
+  }
 }
+
 
 export const db = new DatabaseService();
