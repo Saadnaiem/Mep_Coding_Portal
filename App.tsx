@@ -165,6 +165,10 @@ const App: React.FC = () => {
   const [activeDelegations, setActiveDelegations] = useState<any[]>([]);
   const [delegatedDivisions, setDelegatedDivisions] = useState<string[]>([]);
 
+  // Email Notification Queue State
+  const [pendingEmails, setPendingEmails] = useState<{to: string, subject: string, body: string, label: string}[]>([]);
+  const [showEmailModal, setShowEmailModal] = useState(false);
+
   // Load data from DB on mount
   useEffect(() => {
     if (!isAuthenticated) return; // Prevent data leak: Only fetch if authenticated
@@ -676,16 +680,15 @@ const App: React.FC = () => {
     await db.logAction(newActionPayload);
 
     // --- NOTIFICATION LOGIC ---
-    
+    let emailsToSend: {to: string, subject: string, body: string, label: string}[] = [];
+
     // 1. Notify Next Approver (Employee) - Primary Notification on Approval
     if (actionType === 'approve' && nextStatus === 'in_review') {
          const nextStepDef = MOCK_STEPS.find(s => s.step_number === nextStep);
          if (nextStepDef) {
-             let approverEmails: string[] = [];
-             
              // Special case for Step 2 (Purchasing Manager) or other roles
              const employees = await db.fetchEmployeesByRole(nextStepDef.role_required);
-             approverEmails = employees.map(e => e.email).filter(Boolean);
+             const approverEmails = employees.map(e => e.email).filter(Boolean);
              
              if (approverEmails.length > 0) {
                  const subject = `Action Required: Request ${currentRequest.request_number} - ${nextStepDef.step_name}`;
@@ -719,33 +722,40 @@ Please login to the portal to review and take action.
 Best Regards,
 Al Habib Pharmacy Team`;
                  
-                 // Open mail client for Next Approver
-                 setTimeout(() => {
-                     window.open(`mailto:${approverEmails.join(';')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`);
-                 }, 0);
+                 emailsToSend.push({
+                    to: approverEmails.join(';'),
+                    subject: subject,
+                    body: body,
+                    label: `Notify ${nextStepDef.step_name} (${nextStepDef.role_required.replace(/_/g, ' ')})`
+                 });
              }
          }
     } 
-    // 2. Notify Vendor - Only on Rejection, Return, or if not Approving (to avoid double popups)
-    else {
-        const vendorEmail = currentRequest.vendor?.email_address;
-        if (vendorEmail) {
-            const subject = `Request Update - ${currentRequest.request_number}`;
-            let statusDisplay = nextStatus.toUpperCase().replace(/_/g, ' ');
+    
+    // 2. Notify Vendor
+    const vendorEmail = currentRequest.vendor?.email_address;
+    if (vendorEmail) {
+        const subject = `Request Update - ${currentRequest.request_number}`;
+        
+        let statusDescription = nextStatus.toUpperCase().replace(/_/g, ' ');
+        if (nextStatus === 'in_review') {
+             const nextStepObj = MOCK_STEPS.find(s => s.step_number === nextStep);
+             if (nextStepObj) statusDescription = `Waiting for ${nextStepObj.step_name}`;
+        }
 
-            // Calculate Product Summary for Vendor too
-            const reqProducts = products.filter(p => p.request_id === currentRequest.id);
-            const uniqueBrands = Array.from(new Set(reqProducts.map(p => p.brand))).filter(Boolean);
+        // Calculate Product Summary for Vendor too
+        const reqProducts = products.filter(p => p.request_id === currentRequest.id);
+        const uniqueBrands = Array.from(new Set(reqProducts.map(p => p.brand))).filter(Boolean);
 
-            const body = `Dear ${currentRequest.vendor?.company_name || 'Partner'},
+        const body = `Dear ${currentRequest.vendor?.company_name || 'Partner'},
 
 Your request has been updated.
 
 --- STATUS UPDATE ---
 Request ID:      ${currentRequest.request_number}
-New Status:      ${statusDisplay}
 Action Taken:    ${actionType.toUpperCase()}
 Review Comment:  "${actionComment}"
+New Status:      ${statusDescription}
 
 --- PRODUCT SUMMARY ---
 Total Products:  ${reqProducts.length}
@@ -756,11 +766,12 @@ Please login to the portal to view full details and take necessary actions if re
 Best Regards,
 Al Habib Pharmacy Team`;
             
-            // Open default mail client
-            setTimeout(() => {
-                window.open(`mailto:${vendorEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`);
-            }, 0);
-        }
+        emailsToSend.push({
+            to: vendorEmail,
+            subject: subject,
+            body: body,
+            label: "Notify Vendor"
+        });
     }
 
     // Optimistic UI Update
@@ -770,7 +781,13 @@ Al Habib Pharmacy Team`;
     
     setIsSaving(false); 
     setIsActionModalOpen(false); 
-    setView('dashboard'); 
+    
+    if (emailsToSend.length > 0) {
+        setPendingEmails(emailsToSend);
+        setShowEmailModal(true);
+    } else {
+        setView('dashboard'); 
+    }
   };
 
 
@@ -3222,6 +3239,41 @@ Al Habib Pharmacy Team`;
             <Button className="w-full h-12 bg-[#0F3D3E] text-white" onClick={handlePasswordChange}>
                 Update Password & Login
             </Button>
+        </div>
+      </Modal>
+
+      {/* --- NEW EMAIL ACTION MODAL --- */}
+      <Modal isOpen={showEmailModal} onClose={() => {}} title="Notification Actions Required">
+        <div className="space-y-6">
+            <div className="p-4 bg-blue-50 border-l-4 border-blue-500 text-blue-900 rounded-r-lg text-sm">
+                <p className="font-bold flex items-center gap-2"><Mail size={16} /> Notifications Pending</p>
+                <p className="mt-1 opacity-90">The following notifications need to be sent manually. Please click each button below to open your email client.</p>
+            </div>
+
+            <div className="space-y-4">
+                {pendingEmails.map((email, idx) => (
+                    <div key={idx} className="flex flex-col gap-2 p-4 bg-gray-50 rounded-xl border border-gray-100">
+                        <div className="flex justify-between items-center">
+                            <span className="font-bold text-[#0F3D3E] text-sm">{email.label}</span>
+                            <span className="text-[10px] bg-gray-200 px-2 py-0.5 rounded text-gray-500">{email.to.split(';').length} recipient(s)</span>
+                        </div>
+                        <Button 
+                            className="w-full bg-[#0F3D3E] text-white flex items-center justify-center gap-2"
+                            onClick={() => {
+                                window.open(`mailto:${email.to}?subject=${encodeURIComponent(email.subject)}&body=${encodeURIComponent(email.body)}`);
+                            }}
+                        >
+                            <Mail size={16} /> Send Email
+                        </Button>
+                    </div>
+                ))}
+            </div>
+
+            <div className="pt-4 border-t border-gray-100 flex justify-end">
+                <Button variant="outline" onClick={() => { setShowEmailModal(false); setPendingEmails([]); setView('dashboard'); }}>
+                    Done / Close
+                </Button>
+            </div>
         </div>
       </Modal>
     </div>
