@@ -1941,7 +1941,7 @@ const App: React.FC = () => {
       </div>
 
       {/* Filter Bar */}
-      <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm space-y-4">
+      <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm space-y-4 sticky top-20 md:top-60 z-20">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
              <div className="md:col-span-1">
                 <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1 block">Search</label>
