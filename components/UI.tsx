@@ -36,10 +36,27 @@ export const Card: React.FC<{ title?: string; children: React.ReactNode; classNa
   </div>
 );
 
-export const Badge: React.FC<{ status: RequestStatus; labelSuffix?: string }> = ({ status, labelSuffix }) => {
+const STEP_COLORS = [
+  'bg-[#FDFBF7] text-[#0F3D3E]/60 border border-[#0F3D3E]/10',  // Step 1
+  'bg-[#F9F4E9] text-[#0F3D3E]/70 border border-[#C5A065]/20',  // Step 2
+  'bg-[#F5EDD6] text-[#0F3D3E]/80 border border-[#C5A065]/30',  // Step 3
+  'bg-[#F0E6C3] text-[#0F3D3E]/90 border border-[#C5A065]/40',  // Step 4
+  'bg-[#EBDFA0] text-[#0F3D3E] border border-[#C5A065]/60',     // Step 5
+  'bg-[#E6D780] text-[#0F3D3E] border border-[#C5A065]/80',     // Step 6
+  'bg-[#C5A065] text-white border border-[#C5A065]'             // Step 7
+];
+
+export const Badge: React.FC<{ status: RequestStatus; labelSuffix?: string; currentStep?: number }> = ({ status, labelSuffix, currentStep }) => {
   const config = STATUS_MAP[status] || STATUS_MAP.draft;
+  
+  let colorClass = config.color;
+  if (status === 'in_review' && currentStep) {
+      const idx = Math.max(0, Math.min(currentStep - 1, STEP_COLORS.length - 1));
+      colorClass = STEP_COLORS[idx];
+  }
+
   return (
-    <span className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-[10px] font-serif font-bold tracking-widest uppercase shadow-sm border border-black/5 ${config.color}`}>
+    <span className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-[10px] font-serif font-bold tracking-widest uppercase shadow-sm border ${colorClass}`}>
       {config.icon && <span className="opacity-70 scale-90">{config.icon}</span>}
       {config.label}{labelSuffix ? ` - ${labelSuffix}` : ''}
     </span>

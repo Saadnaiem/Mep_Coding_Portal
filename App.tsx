@@ -59,7 +59,7 @@ import { NewVendorForm } from './components/NewVendorForm';
 import { StaffManagement } from './components/StaffManagement';
 import { Reports } from './components/Reports';
 import { EcommerceExport } from './components/EcommerceExport';
-import { RequestStatus, ProductRequest, UserType, EmployeeRole, Product, StepAction, HierarchyNode } from './types';
+import { RequestStatus, ProductRequest, UserType, EmployeeRole, Product, StepAction, HierarchyNode, Vendor } from './types';
 import { ROLE_LABELS, STATUS_MAP } from './constants';
 
 const EditableField = ({ label, value, onChange, type = 'text', options }: any) => {
@@ -161,6 +161,9 @@ const App: React.FC = () => {
   const [actions, setActions] = useState<StepAction[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [assignedDivisions, setAssignedDivisions] = useState<string[]>([]);
+  // Delegation State
+  const [activeDelegations, setActiveDelegations] = useState<any[]>([]);
+  const [delegatedDivisions, setDelegatedDivisions] = useState<string[]>([]);
 
   // Load data from DB on mount
   useEffect(() => {
@@ -177,7 +180,30 @@ const App: React.FC = () => {
     fetchData();
   }, [isAuthenticated]); 
 
-
+  // Load Delegations
+  useEffect(() => {
+    if (isAuthenticated && activePortal === 'employee' && currentUserProfile?.id) {
+        db.fetchActiveDelegationsForUser(currentUserProfile.id).then(async (delegations) => {
+            setActiveDelegations(delegations);
+            
+            // Resolve Delegated Divisions for Category Managers
+            const delegatedDivisionPromises = delegations
+               .filter(d => d.delegator?.role === 'category_manager' && d.delegator?.email)
+               .map(d => getDivisionsForManager(d.delegator.email));
+            
+            if (delegatedDivisionPromises.length > 0) {
+                const results = await Promise.all(delegatedDivisionPromises);
+                const allDelegatedDivisions = results.flat();
+                setDelegatedDivisions(Array.from(new Set(allDelegatedDivisions)));
+            } else {
+                setDelegatedDivisions([]);
+            }
+        });
+    } else {
+        setActiveDelegations([]);
+        setDelegatedDivisions([]);
+    }
+  }, [isAuthenticated, activePortal, currentUserProfile]);
 
   // Load Divisions if CM
   useEffect(() => {
@@ -224,6 +250,10 @@ const App: React.FC = () => {
   // Filtering & Search
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<RequestStatus | 'all'>('all');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [vendorFilter, setVendorFilter] = useState('all');
 
   // Modal State
   const [isActionModalOpen, setIsActionModalOpen] = useState(false);
@@ -283,20 +313,28 @@ const App: React.FC = () => {
     if (activePortal !== 'employee' || !currentRequest) return false;
     if (currentRequest.status === 'completed' || currentRequest.status === 'rejected') return false;
 
+    // Super Admin Override: Full authority to act on any request at any step
+    if (currentUserEmployee?.role === 'super_admin') return true;
+
     const currentRole = currentUserEmployee?.role || 'category_manager';
     const step = MOCK_STEPS[currentRequest.current_step - 1];
     
+    if (!step) return false;
+
+    // Delegation Logic: Effective Roles = Native + Delegated
+    const effectiveRoles = [currentRole, ...activeDelegations.map(d => d.delegator?.role || '')];
+
     // 1. Role Check
-    if (!step || step.role_required !== currentRole) return false;
+    if (!effectiveRoles.includes(step.role_required)) return false;
 
     // 2. Division Check (for Category Managers)
-    if (currentRole === 'category_manager') {
-        const myDivisions = assignedDivisions;
-        return myDivisions.includes(currentRequest.category);
+    if (step.role_required === 'category_manager') {
+        const effectiveDivisions = [...assignedDivisions, ...delegatedDivisions];
+        return effectiveDivisions.some(d => d?.toLowerCase() === currentRequest.category?.toLowerCase());
     }
     
     return true;
-  }, [activePortal, currentRequest, currentUserEmployee, currentUserProfile, assignedDivisions]);
+  }, [activePortal, currentRequest, currentUserEmployee, currentUserProfile, assignedDivisions, activeDelegations, delegatedDivisions]);
 
   const canViewHistory = useMemo(() => {
     // Both vendors and employees should see history
@@ -324,42 +362,105 @@ const App: React.FC = () => {
              // Strict Rule: Only show requests matching assigned divisions
              if (assignedDivisions.length === 0) return false;
 
-             const matchesDivision = assignedDivisions.some(d => d.toLowerCase() === r.category.toLowerCase());
+             const matchesDivision = assignedDivisions.some(d => d?.toLowerCase() === r.category?.toLowerCase());
              if (!matchesDivision) return false;
          }
          // Other roles (Admin, Supply Chain, QC) currently see all requests in Dashboard
       }
       
       const vendorName = r.vendor?.company_name || '';
-      const matchesSearch = r.request_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      const matchesSearch = (r.request_number?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
                            vendorName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                           r.category.toLowerCase().includes(searchQuery.toLowerCase());
+                           (r.category?.toLowerCase() || '').includes(searchQuery.toLowerCase());
       const matchesStatus = statusFilter === 'all' || r.status === statusFilter;
-      return matchesSearch && matchesStatus;
+      
+      const matchesCategory = categoryFilter === 'all' || r.category === categoryFilter;
+      const matchesVendor = vendorFilter === 'all' || vendorName === vendorFilter;
+
+      let matchesDate = true;
+      if (dateFrom || dateTo) {
+          const rDate = new Date(r.created_at).setHours(0,0,0,0);
+          const from = dateFrom ? new Date(dateFrom).setHours(0,0,0,0) : null;
+          const to = dateTo ? new Date(dateTo).setHours(0,0,0,0) : null;
+          if (from && rDate < from) matchesDate = false;
+          if (to && rDate > to) matchesDate = false;
+      }
+
+      return matchesSearch && matchesStatus && matchesCategory && matchesVendor && matchesDate;
     });
-  }, [requests, searchQuery, statusFilter, activePortal, currentUserProfile, currentVendor, currentUserEmployee, assignedDivisions]);
+  }, [requests, searchQuery, statusFilter, dateFrom, dateTo, categoryFilter, vendorFilter, activePortal, currentUserProfile, currentVendor, currentUserEmployee, assignedDivisions]);
 
   const employeeInbox = useMemo(() => {
     if (activePortal !== 'employee') return [];
-    const currentRole = currentUserEmployee?.role || 'category_manager';
     
-    // Get assigned divisions if the user is a category manager
-    const myDivisions = (currentRole === 'category_manager') 
-      ? assignedDivisions 
-      : [];
+    // Effective Roles = Native + Delegated
+    const currentRole = currentUserEmployee?.role || 'category_manager';
+    const effectiveRoles = [currentRole, ...activeDelegations.map(d => d.delegator?.role || '')];
+
+    // Super Admin sees ALL actionable requests (Total Override)
+    if (currentRole === 'super_admin') {
+        return requests.filter(r => r.status !== 'completed' && r.status !== 'rejected');
+    }
 
     return requests.filter(r => {
       const step = MOCK_STEPS[r.current_step - 1];
-      const roleMatch = step && step.role_required === currentRole;
+      if (!step) return false;
+
+      // Check if ANY of the user's active/delegated roles match the step requirement
+      const roleMatch = effectiveRoles.includes(step.role_required);
       
-      // If Category Manager, ensure request matches assigned division
-      const divisionMatch = (currentRole === 'category_manager')
-        ? (myDivisions.length > 0 && myDivisions.some(d => d.toLowerCase() === r.category.toLowerCase()))
-        : true;
+      // Division Match Logic
+      let divisionMatch = true;
+      if (step.role_required === 'category_manager') {
+         // Use combined divisions (Native + Delegated)
+         const effectiveDivisions = [...assignedDivisions, ...delegatedDivisions];
+         divisionMatch = effectiveDivisions.length > 0 && effectiveDivisions.some(d => d?.toLowerCase() === r.category?.toLowerCase());
+      }
       
-      return roleMatch && divisionMatch && r.status !== 'completed' && r.status !== 'rejected';
+      const basicMatch = roleMatch && divisionMatch && r.status !== 'completed' && r.status !== 'rejected';
+
+      // Apply shared filters to inbox as well
+      if (!basicMatch) return false;
+
+      const vendorName = r.vendor?.company_name || '';
+      const matchesSearch = (r.request_number?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+                           vendorName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                           (r.category?.toLowerCase() || '').includes(searchQuery.toLowerCase());
+      
+      const matchesStatus = statusFilter === 'all' || r.status === statusFilter;
+      const matchesCategory = categoryFilter === 'all' || r.category === categoryFilter;
+      const matchesVendor = vendorFilter === 'all' || vendorName === vendorFilter;
+
+      let matchesDate = true;
+      if (dateFrom || dateTo) {
+          const rDate = new Date(r.created_at).setHours(0,0,0,0);
+          const from = dateFrom ? new Date(dateFrom).setHours(0,0,0,0) : null;
+          const to = dateTo ? new Date(dateTo).setHours(0,0,0,0) : null;
+          if (from && rDate < from) matchesDate = false;
+          if (to && rDate > to) matchesDate = false;
+      }
+
+      return matchesSearch && matchesStatus && matchesCategory && matchesVendor && matchesDate;
     });
-  }, [requests, activePortal, currentUserEmployee, currentUserProfile, assignedDivisions]);
+  }, [requests, activePortal, currentUserEmployee, currentUserProfile, assignedDivisions, activeDelegations, delegatedDivisions, searchQuery, statusFilter, dateFrom, dateTo, categoryFilter, vendorFilter]);
+
+    // Derive filter options based on user visibility (not filtered by current search)
+    // MOVED TO TOP LEVEL
+    const baseVisibleRequests = useMemo(() => {
+        return requests.filter(r => {
+             if (activePortal === 'vendor') {
+                 return (currentVendor && r.vendor_id === currentVendor.id) || r.vendor_id === currentUserProfile?.id;
+             }
+             // For Category Managers, only show assigned divisions in options
+             if (activePortal === 'employee' && currentUserEmployee?.role === 'category_manager') {
+                  if (assignedDivisions.length > 0) return assignedDivisions.some(d => d?.toLowerCase() === r.category?.toLowerCase());
+             }
+             return true; 
+        });
+    }, [requests, activePortal, currentUserProfile, currentVendor, currentUserEmployee, assignedDivisions]);
+
+    const uniqueCategories = useMemo(() => Array.from(new Set(baseVisibleRequests.map(r => r.category))).filter(Boolean).sort(), [baseVisibleRequests]);
+    const uniqueVendors = useMemo(() => Array.from(new Set(baseVisibleRequests.map(r => r.vendor?.company_name || ''))).filter(Boolean).sort(), [baseVisibleRequests]);
 
   const handleLogout = () => {
     setIsAuthenticated(false);
@@ -578,7 +679,17 @@ const App: React.FC = () => {
     const vendorEmail = currentRequest.vendor?.email_address;
     if (vendorEmail) {
         const subject = `Request Update - ${currentRequest.request_number}`;
-        const body = `Dear Partner,\n\nYour request (${currentRequest.request_number}) has been updated.\n\nNew Status: ${nextStatus.toUpperCase().replace(/_/g, ' ')}\nAction: ${actionType.toUpperCase()}\nComment: ${actionComment}\n\nPlease login to the portal to view details.\n\nBest Regards,\nAl Habib Pharmacy Team`;
+        
+        let statusDisplay = nextStatus.toUpperCase().replace(/_/g, ' ');
+        if (nextStatus === 'in_review') {
+             const step = MOCK_STEPS.find(s => s.step_number === nextStep);
+             if (step) {
+                 const roleTitle = step.step_name.replace(/ Approval$/i, '').replace(/ Issuance$/i, '');
+                 statusDisplay = `WAITING APPROVAL FROM ${roleTitle.toUpperCase()}`;
+             }
+        }
+
+        const body = `Dear ${currentRequest.vendor?.company_name || 'Partner'},\n\nYour request (${currentRequest.request_number}) has been updated.\n\nAction: ${actionType.toUpperCase()}\nComment: ${actionComment}\nNew Status: ${statusDisplay}\n\nPlease login to the portal to view details.\n\nBest Regards,\nAl Habib Pharmacy Team`;
         
         // Open default mail client
         window.open(`mailto:${vendorEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`);
@@ -1058,7 +1169,7 @@ const App: React.FC = () => {
     // --- PAGE 1: SUMMARY & DETAILS ---
     
     // Header Text
-    centerText("MEP CODING PORTAL", 45, 24, "times", "bold", "#0F3D3E");
+    centerText("AL HABIB PHARMACY CODING PORTAL", 45, 24, "times", "bold", "#0F3D3E");
     centerText("Al Habib Pharmacy Product Request Summary", 55, 14, "helvetica", "bold", "#C5A065");
     centerText(`Request ID: ${currentRequest.request_number}`, 65, 16, "helvetica", "bold", "#1E40AF");
     
@@ -1142,6 +1253,10 @@ const App: React.FC = () => {
         }
         
         if (lastAction) {
+             const stepRole = step.role_required;
+             const actorRole = lastAction.actor_role; // You may need to ensure this is populated in your query
+             const isDelegated = stepRole && actorRole && stepRole !== actorRole && actorRole !== 'super_admin' && actorRole !== 'vendor';
+
              if (lastAction.action === 'approve') {
                  derivedStatus = 'APPROVED';
                  statusColor = [220, 252, 231]; 
@@ -1154,6 +1269,15 @@ const App: React.FC = () => {
                  derivedStatus = 'RETURNED';
                  statusColor = [255, 237, 213];
                  textColor = [154, 52, 18];
+             }
+             
+             // Append Delegation Note to Comment if detected
+             if (isDelegated) {
+                 // Clone object to avoid mutating state directly in render loop if using state ref
+                 // Actually this map creates new object, so safe.
+                 const note = "\n[DELEGATED AUTHORITY]";
+                 if (!lastAction.comment) lastAction.comment = note;
+                 else if (!lastAction.comment.includes("DELEGATED")) lastAction.comment += note;
              }
         }
         
@@ -1688,11 +1812,11 @@ const App: React.FC = () => {
         doc.setFont("helvetica", "bold");
         doc.setFontSize(8);
         doc.setTextColor(15, 61, 62); // Teal
-        doc.text("MEP CODING PORTAL", 15, footerY);
+        doc.text("AL HABIB PHARMACY CODING PORTAL", 15, footerY);
         
         doc.setFont("helvetica", "normal");
         doc.setTextColor(120);
-        doc.text(" | Al Habib Pharmacy", 15 + doc.getTextWidth("MEP CODING PORTAL"), footerY);
+        doc.text(" | Al Habib Pharmacy", 15 + doc.getTextWidth("AL HABIB PHARMACY CODING PORTAL"), footerY);
 
         // Center: Timestamp
         doc.setFontSize(7);
@@ -1724,11 +1848,11 @@ const App: React.FC = () => {
         </button>
         <div className="flex items-center gap-3 md:gap-5 cursor-pointer group" onClick={() => setView('dashboard')}>
           <div className="w-12 h-12 md:w-72 md:h-56 flex items-center justify-center transition-all duration-500 group-hover:scale-105">
-             <img src="/logo.png" alt="MEP Logo" className="w-full h-full object-contain drop-shadow-sm" />
+             <img src="/logo.png" alt="Al Habib Pharmacy Logo" className="w-full h-full object-contain drop-shadow-sm" />
           </div>
           <div className="flex flex-col justify-center h-full pt-1 md:pt-2">
-            <h1 className="font-sans font-bold text-base md:text-4xl tracking-tight text-[#0F3D3E] leading-none mb-1 md:mb-2">MEP Coding Portal</h1>
-            <h2 className="text-[9px] md:text-[11px] font-bold text-[#C5A065] uppercase tracking-[0.05em]">Al Habib Pharmacy</h2>
+            <h1 className="font-sans font-bold text-base md:text-4xl tracking-tight text-[#0F3D3E] leading-none mb-1 md:mb-2">Al Habib Pharmacy Coding Portal</h1>
+            <h2 className="font-sans text-xs md:text-xl font-bold text-[#C5A065] tracking-[0.05em]">Middle East Pharmacies Company (MEPCO)</h2>
           </div>
         </div>
       </div>
@@ -1815,6 +1939,64 @@ const App: React.FC = () => {
         </div>
         {activePortal === 'vendor' && <Button onClick={() => setView('new_request')} className="w-full md:w-auto px-8 h-12 shadow-lg shadow-[#0F3D3E]/20 hover:scale-105"><Plus size={20} />New Request</Button>}
       </div>
+
+      {/* Filter Bar */}
+      <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+             <div className="md:col-span-1">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1 block">Search</label>
+                <div className="relative">
+                    <Search className="absolute left-3 top-2.5 text-gray-400" size={16} />
+                    <input 
+                        type="text" 
+                        placeholder="Search all columns..." 
+                        className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:border-[#C5A065] focus:outline-none"
+                        value={searchQuery}
+                        onChange={e => setSearchQuery(e.target.value)}
+                    />
+                </div>
+             </div>
+             <div>
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1 block">Date Range</label>
+                <div className="flex gap-2">
+                    <input type="date" className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg text-xs" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
+                    <input type="date" className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg text-xs" value={dateTo} onChange={e => setDateTo(e.target.value)} />
+                </div>
+             </div>
+             <div>
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1 block">Category</label>
+                <select className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg text-sm" value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)}>
+                    <option value="all">All Categories</option>
+                    {uniqueCategories.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+             </div>
+             <div>
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1 block">Details</label>
+                 <div className="grid grid-cols-2 gap-2">
+                    <select className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg text-sm" value={statusFilter} onChange={e => setStatusFilter(e.target.value as any)}>
+                        <option value="all">All Status</option>
+                        <option value="draft">Draft</option>
+                        <option value="in_review">In Review</option>
+                        <option value="completed">Completed</option>
+                        <option value="rejected">Rejected</option>
+                        <option value="vendor_revision_required">Revision</option>
+                    </select>
+                     <select className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg text-sm" value={vendorFilter} onChange={e => setVendorFilter(e.target.value)}>
+                        <option value="all">All Partners</option>
+                        {uniqueVendors.map(v => <option key={v} value={v}>{v}</option>)}
+                    </select>
+                 </div>
+             </div>
+          </div>
+          {(searchQuery || statusFilter !== 'all' || dateFrom || dateTo || categoryFilter !== 'all' || vendorFilter !== 'all') && (
+              <div className="flex justify-end">
+                  <button onClick={() => { setSearchQuery(''); setStatusFilter('all'); setDateFrom(''); setDateTo(''); setCategoryFilter('all'); setVendorFilter('all'); }} className="text-xs text-red-500 hover:text-red-700 font-bold flex items-center gap-1">
+                      <Trash2 size={12} /> Clear Filters
+                  </button>
+              </div>
+          )}
+      </div>
+
       <Card title={isInbox ? "Your Action Items" : "Request Pipeline"} noPadding className="border-t-4 border-t-[#C5A065]">
         {/* Mobile View: Cards */}
         <div className="md:hidden flex flex-col divide-y divide-gray-100">
@@ -1827,7 +2009,7 @@ const App: React.FC = () => {
                              <div>
                                  <div className="flex items-center gap-2">
                                     <p className="font-bold text-[#0F3D3E] font-serif text-base">{req.request_number}</p>
-                                    <span className="text-[9px] font-bold bg-[#F0F4F4] text-[#0F3D3E] px-2 py-0.5 rounded border border-gray-200">{req.category}</span>
+                                    <span className="text-[9px] font-bold bg-[#F0F4F4] text-[#0F3D3E] px-2 py-0.5 rounded border border-gray-200 whitespace-nowrap">{req.category}</span>
                                  </div>
                                  <p className="text-xs text-gray-500 font-medium mt-1 line-clamp-1">{req.vendor?.company_name}</p>
                              </div>
@@ -1835,7 +2017,7 @@ const App: React.FC = () => {
                         
                         <div className="flex justify-between items-end">
                              <div className="flex flex-col gap-2">
-                                 <Badge status={req.status} labelSuffix={req.status === 'in_review' ? MOCK_STEPS.find(s => s.step_number === req.current_step)?.step_name : undefined} />
+                                  <Badge status={req.status} currentStep={req.current_step} labelSuffix={req.status === 'in_review' ? "Waiting Approval from " + MOCK_STEPS.find(s => s.step_number === req.current_step)?.step_name.replace(/ Approval$/i, '').replace(/ Issuance$/i, '') : undefined} />
                                  <span className="text-[10px] text-gray-400 font-bold tracking-wider">{formatKSA(req.created_at)}</span>
                              </div>
                              <div className="h-8 w-8 flex items-center justify-center rounded-full bg-[#C5A065]/10 text-[#C5A065]">
@@ -1868,8 +2050,8 @@ const App: React.FC = () => {
                 <tr key={req.id} className="border-b border-gray-50 hover:bg-[#F0F4F4]/50 transition-colors duration-200">
                   <td className="py-6 px-8 font-bold text-[#0F3D3E] font-serif">{req.request_number}</td>
                   <td className="py-6 px-8 text-sm font-medium text-gray-600">{req.vendor?.company_name}</td>
-                  <td className="py-6 px-8"><span className="text-[10px] font-bold bg-[#F0F4F4] text-[#0F3D3E] px-3 py-1.5 rounded-lg tracking-wide border border-transparent">{req.category}</span></td>
-                  <td className="py-6 px-8"><Badge status={req.status} labelSuffix={req.status === 'in_review' ? MOCK_STEPS.find(s => s.step_number === req.current_step)?.step_name : undefined} /></td>
+                  <td className="py-6 px-8"><span className="text-[10px] font-bold bg-[#F0F4F4] text-[#0F3D3E] px-3 py-1.5 rounded-lg tracking-wide border border-transparent whitespace-nowrap">{req.category}</span></td>
+                  <td className="py-6 px-8"><Badge status={req.status} currentStep={req.current_step} labelSuffix={req.status === 'in_review' ? "Waiting Approval from " + MOCK_STEPS.find(s => s.step_number === req.current_step)?.step_name.replace(/ Approval$/i, '').replace(/ Issuance$/i, '') : undefined} /></td>
                   <td className="py-6 px-8 text-xs font-bold text-[#0F3D3E]/70">{formatKSA(req.created_at)}</td>
                   <td className="py-6 px-8 text-right"><Button variant="ghost" className="hover:bg-[#C5A065]/10 hover:text-[#C5A065]" onClick={() => { setSelectedRequestId(req.id); setView('request_details'); }}><ChevronRight size={24} className="text-[#C5A065]" strokeWidth={3} /></Button></td>
                 </tr>
@@ -2234,17 +2416,18 @@ const App: React.FC = () => {
            </div>
         </div>
       )}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-gray-100 pb-8 gap-6 md:gap-0">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-gray-100 pb-8 gap-6 md:gap-0 sticky top-20 md:top-60 z-30 bg-[#fcfdfc] pt-4 -mt-4 transition-all">
         <div className="flex items-center gap-4 md:gap-6 w-full">
           <button onClick={() => setView('dashboard')} className="p-3 bg-white border-2 border-[#C5A065]/20 rounded-xl text-[#C5A065] hover:text-[#0F3D3E] hover:border-[#0F3D3E] hover:scale-105 transition-all"><ArrowLeft size={24} strokeWidth={3} /></button>
           <div className="flex-1">
             <h2 className="text-2xl md:text-4xl font-serif font-black text-[#0F3D3E] tracking-tight mb-2 break-all">{currentRequest?.request_number}</h2>
             <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
                <Badge 
-                 status={currentRequest?.status || 'draft'} 
+                 status={currentRequest?.status || 'draft'}
+                 currentStep={currentRequest?.current_step} 
                  labelSuffix={currentRequest?.status === 'in_review' ? (
-                    (assignedManagerName && currentRequest?.current_step === 1) ? `Waiting for ${assignedManagerName}` : 
-                    MOCK_STEPS.find(s => s.step_number === currentRequest?.current_step)?.step_name
+                    (assignedManagerName && currentRequest?.current_step === 1) ? `Waiting Approval from ${assignedManagerName}` : 
+                    `Waiting Approval from ${MOCK_STEPS.find(s => s.step_number === currentRequest?.current_step)?.step_name.replace(/ Approval$/i, '').replace(/ Issuance$/i, '')}`
                  ) : undefined}
                />
                <span className="text-[10px] md:text-xs font-bold text-[#C5A065] uppercase tracking-widest">Created {formatKSA(currentRequest?.created_at!)}</span>
@@ -2266,8 +2449,8 @@ const App: React.FC = () => {
       </div>
       <Card title="Onboarding Progress" noPadding className="border-t-4 border-t-[#C5A065]">
         <div className="p-4 md:p-12 overflow-x-auto"><Stepper currentStep={currentRequest?.current_step || 1} totalSteps={MOCK_STEPS.length} labels={MOCK_STEPS.map(s => s.step_name)} /></div>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 p-6 md:p-10 bg-[#f8f9fa] border-t border-gray-100">
-          <div className="space-y-6">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-10 p-6 md:p-10 bg-[#f8f9fa] border-t border-gray-100">
+          <div className="space-y-6 lg:col-span-3">
 
             <Card title="Product Listing Details" className="bg-white shadow-sm border border-gray-100">
                <div className="space-y-6">
@@ -2547,7 +2730,7 @@ const App: React.FC = () => {
                 </>
            )}
           </div>
-          <div className="space-y-8">
+          <div className="space-y-8 lg:col-span-2">
              {/* Decision History is visible to everyone within the context of a Request */}
              <Card title="Audit Log & Decision History" className="bg-white shadow-sm border border-gray-100">
                <div className="space-y-8 pl-2">
@@ -2570,6 +2753,21 @@ const App: React.FC = () => {
                              {ROLE_LABELS[a.actor_role as EmployeeRole] || a.actor_role.replace(/_/g, ' ')}
                            </span>
                         )}
+                        {/* Check for Delegation: Match step requirement vs actual actor */}
+                        {(() => {
+                            const stepDef = MOCK_STEPS.find(s => s.step_number === a.step_number);
+                            const requiredRole = stepDef?.role_required;
+                            const isDelegated = requiredRole && a.actor_role && requiredRole !== a.actor_role && a.actor_role !== 'super_admin' && a.actor_role !== 'vendor';
+                            
+                            if (isDelegated) {
+                                return (
+                                    <span className="block mt-0.5 text-purple-600 bg-purple-50 px-2 py-0.5 rounded w-fit font-bold uppercase tracking-wider text-[8px] border border-purple-100">
+                                        Acting as Delegatee
+                                    </span>
+                                );
+                            }
+                            return null;
+                        })()}
                       </p>
                       {a.comment && <div className="mt-4 p-5 bg-[#F0F4F4] rounded-tr-2xl rounded-br-2xl rounded-bl-2xl border border-gray-100 text-sm italic text-[#0F3D3E]/80 leading-relaxed font-serif relative"><span className="absolute -top-3 -left-1 text-4xl text-[#C5A065] opacity-30 font-serif">"</span>{a.comment}</div>}
                    </div>
@@ -2868,6 +3066,7 @@ const App: React.FC = () => {
                     <>
                         <SidebarItem icon={Users} label="Access Management" active={view === 'admin_staff'} onClick={() => { setView('admin_staff'); if(window.innerWidth < 768) setIsSidebarOpen(false); }} collapsed={!isSidebarOpen} />
                         <SidebarItem icon={FileText} label="Master Reports" active={view === 'reports'} onClick={() => { setView('reports'); if(window.innerWidth < 768) setIsSidebarOpen(false); }} collapsed={!isSidebarOpen} />
+                        <SidebarItem icon={Download} label="Products Export" active={view === 'ecommerce_export'} onClick={() => { setView('ecommerce_export'); if(window.innerWidth < 768) setIsSidebarOpen(false); }} collapsed={!isSidebarOpen} />
                     </>
                     )}
                     {activePortal === 'vendor' && <SidebarItem icon={ClipboardList} label="Audit Log" active={view === 'audit_log'} onClick={() => { setView('audit_log'); if(window.innerWidth < 768) setIsSidebarOpen(false); }} collapsed={!isSidebarOpen} />}
@@ -2876,7 +3075,7 @@ const App: React.FC = () => {
             )}
           </div>
         </aside>
-        <main className="flex-1 p-4 md:p-8 lg:p-14 overflow-y-auto h-[calc(100vh-6rem)] scroll-smooth w-full">
+        <main className="flex-1 p-4 md:p-8 lg:p-14 w-full h-auto">
           {view === 'dashboard' && Dashboard()}
           {view === 'vendor_profile' && <VendorProfile />}
           {view === 'request_details' && <RequestDetails />}

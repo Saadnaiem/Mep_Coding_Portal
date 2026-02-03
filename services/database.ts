@@ -262,6 +262,69 @@ class DatabaseService {
     }
     return data;
   }
+
+  // --- Delegations ---
+  async fetchDelegations(): Promise<any[]> {
+    const { data, error } = await supabase
+      .from('delegations')
+      .select(`
+        *,
+        delegator:profiles!delegator_id(full_name, role),
+        delegatee:profiles!delegatee_id(full_name, role)
+      `)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+        console.error('Error fetching delegations:', error);
+        return [];
+    }
+    return data;
+  }
+
+  async createDelegation(delegation: Partial<any>): Promise<boolean> {
+     const { error } = await supabase
+        .from('delegations')
+        .insert(delegation);
+     
+     if (error) {
+         console.error('Error creating delegation:', error);
+         alert("Failed to create delegation: " + error.message);
+         return false;
+     }
+     return true;
+  }
+  
+  async deleteDelegation(id: string): Promise<boolean> {
+      const { error } = await supabase
+        .from('delegations')
+        .delete()
+        .eq('id', id);
+        
+      if (error) {
+          console.error("Error deleting delegation", error);
+          return false;
+      }
+      return true;
+  }
+
+  async fetchActiveDelegationsForUser(userId: string): Promise<any[]> {
+      const now = new Date().toISOString();
+      const { data, error } = await supabase
+        .from('delegations')
+        .select(`
+            *,
+            delegator:profiles!delegator_id(*)
+        `)
+        .eq('delegatee_id', userId)
+        .lte('start_date', now)
+        .gte('end_date', now);
+        
+      if (error) {
+          console.error("Error fetching active delegations", error);
+          return [];
+      }
+      return data;
+  }
 }
 
 export const db = new DatabaseService();

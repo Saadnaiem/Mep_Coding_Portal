@@ -4,6 +4,8 @@ import { db } from '../services/database';
 import { ProductRequest, Product, RequestStatus } from '../types';
 import { Download, FileDown, User, Mail, Phone, Activity, Search } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
+import { saveAs } from 'file-saver';
 import { MOCK_STEPS } from '../services/mockDb';
 import { ROLE_LABELS } from '../constants';
 
@@ -181,11 +183,15 @@ export const EcommerceExport: React.FC = () => {
         XLSX.writeFile(workbook, `Ecommerce_All_Products_Tracking_${new Date().toISOString().split('T')[0]}.xlsx`);
     };
 
-    const handleExport = () => {
+
+    const handleExport = async () => {
         if (completedProductsWithCode.length === 0) {
             alert("No ready-to-sync products found (must have Item Code).");
             return;
         }
+
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet('E-Commerce Master');
 
         // Logic from Reports.tsx handleEcommerceExport
         const headers = [
@@ -194,62 +200,109 @@ export const EcommerceExport: React.FC = () => {
             'STORAGE_AR', 'COMPOSITION_US', 'COMPOSITION_AR', 'INDICATION_AR', 'INDICATION_US', 
             'HOW_TO_USE_US', 'HOW_TO_USE_AR', 'POSSIBLE_SIDE_EFFECTS/WARNINGS_US', 
             'POSSIBLE_SIDE_EFFECTS/WARNINGS_AR', 'Category', 'Group', 'Subgroup', 
-            'Tags/Filters  (*Tags can be chosen based on the filters from column V to AG, with comma seprated*)', 
+            'Tags/Filters  (Tags can be chosen based on the filters from column V to AG, with comma seprated)', 
             'Suggested Filters in BEAUTY',
             'Division', 'Department', 'Category (POP)', 'Sub-Category (POP)', 'Class',
             'Image 1', 'Image 2', 'Image 3', 'Image 4', 'Image 5', 'Image 6'
         ];
 
-        const rows = completedProductsWithCode.map(item => {
-            const row = new Array(headers.length).fill('');
-            row[0] = item.erp_item_code || ''; // SKU UBC/GTIN
-            row[1] = item.product_name; // NAME/ DESCRIPTION_US
-            row[2] = item.product_name_ar; // NAME/ DESCRIPTION_AR
-            row[3] = item.brand; // BRAND Name_US
-            row[4] = ''; // BRAND Name_AR
-            
-            row[7] = item.storage_condition || ''; // STORAGE_US
+        // Add Headers Row
+        const headerRow = worksheet.addRow(headers);
+        headerRow.font = { bold: true };
+        headerRow.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FFEBF1F1' }
+        };
 
-            // Append 5-level hierarchy
-            row[22] = item.division;     // Division
-            row[23] = item.department;   // Department
-            row[24] = item.category;     // Category (POP)
-            row[25] = item.sub_category; // Sub-Category (POP)
-            row[26] = item.class_name;   // Class
+        // Process Data and Add Rows
+        completedProductsWithCode.forEach(item => {
+             const rowData = new Array(headers.length).fill('');
+             
+             rowData[0] = item.erp_item_code || ''; // SKU UBC/GTIN
+             rowData[1] = item.product_name; // NAME/ DESCRIPTION_US
+             rowData[2] = item.product_name_ar; // NAME/ DESCRIPTION_AR
+             rowData[3] = item.brand; // BRAND Name_US
+             rowData[4] = item.brand_ar || ''; // BRAND Name_AR
+             
+             // E-Commerce Assets Mappings
+             rowData[5] = item.short_description_en || '';
+             rowData[6] = item.short_description_ar || '';
+             rowData[7] = item.storage_condition || ''; // STORAGE_US
+             rowData[8] = item.storage_condition_ar || '';
+             rowData[9] = item.composition_en || '';
+             rowData[10] = item.composition_ar || '';
+             rowData[11] = item.indication_ar || '';
+             rowData[12] = item.indication_en || '';
+             rowData[13] = item.how_to_use_en || '';
+             rowData[14] = item.how_to_use_ar || '';
+             rowData[15] = item.side_effects_en || '';
+             rowData[16] = item.side_effects_ar || '';
+             
+             // Tags
+             rowData[20] = item.tags_filters || '';
+             rowData[21] = item.suggested_filters || '';
+ 
+             // Append 5-level hierarchy
+             rowData[22] = item.division;     // Division
+             rowData[23] = item.department;   // Department
+             rowData[24] = item.category;     // Category (POP)
+             rowData[25] = item.sub_category; // Sub-Category (POP)
+             rowData[26] = item.class_name;   // Class
+ 
+             const newRow = worksheet.addRow(rowData);
 
-            // Images
-            if (item.images && item.images.length > 0) {
-                item.images.forEach((img, idx) => {
-                    if (idx < 6) {
-                        try {
-                            // Extract extension or default to jpg
-                            const extMatch = img.match(/\.([a-zA-Z0-9]+)(\?|$)/);
-                            const ext = extMatch ? extMatch[1] : 'jpg';
-                            
-                            const suffix = idx === 0 ? '' : `_${idx + 1}`;
-                            const fileName = `${item.erp_item_code}${suffix}.${ext}`;
-                            
-                            // Append ?download=FILENAME to force download behavior and rename the file
-                            const separator = img.includes('?') ? '&' : '?';
-                            const downloadUrl = `${img}${separator}download=${encodeURIComponent(fileName)}`;
-
-                            // Use SheetJS cell object with hyperlink
-                            row[27 + idx] = { v: fileName, l: { Target: downloadUrl } };
-                        } catch (e) {
-                            // Fallback to raw URL if parsing fails
-                            row[27 + idx] = img;
-                        }
-                    }
-                });
-            }
-
-            return row;
+             // Handle Images Hyperlinks
+             if (item.images && item.images.length > 0) {
+                 item.images.forEach((img, idx) => {
+                     if (idx < 6) {
+                         try {
+                             const colIndex = 28 + idx; // 1-based in exceljs? no row is object, but we used array. Array in exceljs is 1-based for cells lookup. 
+                             // Actually row.getCell(1) is first col.
+                             // headers length is 33. Images start at index 27 in array (28th column).
+                             
+                             const extMatch = img.match(/\.([a-zA-Z0-9]+)(\?|$)/);
+                             const ext = extMatch ? extMatch[1] : 'jpg';
+                             const suffix = idx === 0 ? '' : `_${idx + 1}`;
+                             const fileName = `${item.erp_item_code}${suffix}.${ext}`;
+                             
+                             const separator = img.includes('?') ? '&' : '?';
+                             const downloadUrl = `${img}${separator}download=${encodeURIComponent(fileName)}`;
+ 
+                             const cell = newRow.getCell(colIndex);
+                             cell.value = { text: fileName, hyperlink: downloadUrl };
+                             cell.font = { color: { argb: 'FF0000FF' }, underline: true };
+                         } catch (e) {
+                             newRow.getCell(28 + idx).value = img;
+                         }
+                     }
+                 });
+             }
         });
 
-        const workbook = XLSX.utils.book_new();
-        const worksheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
-        XLSX.utils.book_append_sheet(workbook, worksheet, "E-Commerce Master");
-        XLSX.writeFile(workbook, `Ecommerce_Master_Export_${new Date().toISOString().split('T')[0]}.xlsx`);
+        // Set Column Widths and Alignment (Wrap Text)
+        worksheet.columns.forEach((column, i) => {
+             // Text heavy columns indices (0-based): 5,6,7,8,9,10,11,12,13,14,15,16,20,21
+             const isTextColumn = [5,6,7,8,9,10,11,12,13,14,15,16,20,21].includes(i);
+             const isImageColumn = i >= 27; // Images
+
+             if (isTextColumn) {
+                 column.width = 50;
+                 column.alignment = { wrapText: true, vertical: 'top', horizontal: 'left' };
+             } else if (isImageColumn) {
+                 column.width = 20;
+                 column.alignment = { vertical: 'top', horizontal: 'left' };
+             } else {
+                 // Auto fit loosely
+                 const headerText = headers[i] || '';
+                 column.width = Math.max(headerText.length + 5, 15);
+                 column.alignment = { vertical: 'top', horizontal: 'left' };
+             }
+        });
+
+        // Write and Save
+        const buffer = await workbook.xlsx.writeBuffer();
+        saveAs(new Blob([buffer]), `Ecommerce_Master_Export_${new Date().toISOString().split('T')[0]}.xlsx`);
     };
 
     return (
@@ -304,7 +357,7 @@ export const EcommerceExport: React.FC = () => {
                                     </div>
                                     
                                     <h4 className="font-serif font-bold text-[#0F3D3E] mb-0.5 leading-tight">{p.product_name}</h4>
-                                    <p className="text-[10px] text-gray-500 mb-3">{p.brand} &bull; {p.product_name_ar}</p>
+                                    <p className="text-[10px] text-gray-500 mb-3">{p.brand} &bull; {p.product_name_ar} &bull; {p.images?.length || 0} Images</p>
                                     
                                     <div className="bg-[#F0F4F4] p-3 rounded-lg text-xs space-y-2 border border-blue-100/50">
                                         <div className="flex items-center gap-2">
@@ -331,6 +384,7 @@ export const EcommerceExport: React.FC = () => {
                                      <th className="p-4 font-bold">Category (Division)</th>
                                      <th className="p-4 font-bold">Product Name</th>
                                      <th className="p-4 font-bold">Brand</th>
+                                     <th className="p-4 font-bold">Images</th>
                                      <th className="p-4 font-bold">Vendor Contact</th>
                                      <th className="p-4 font-bold">Status / Waiting On</th>
                                  </tr>
@@ -343,12 +397,13 @@ export const EcommerceExport: React.FC = () => {
                                          <tr key={p.id} className="hover:bg-[#F0F4F4]/50">
                                              <td className="p-4 font-black text-xs text-[#0F3D3E]">{p.request_number}</td>
                                              <td className="p-4 font-mono font-bold text-xs">{p.erp_item_code || <span className="text-amber-500">Pending</span>}</td>
-                                             <td className="p-4 text-xs font-bold text-gray-500">{p.division}</td>
+                                             <td className="p-4 text-xs font-bold text-gray-500 whitespace-nowrap">{p.division}</td>
                                              <td className="p-4 font-medium text-[#0F3D3E]">
                                                  {p.product_name}
                                                  <div className="text-[10px] text-gray-400">{p.product_name_ar}</div>
                                              </td>
                                              <td className="p-4 font-bold text-[#0F3D3E]">{p.brand}</td>
+                                             <td className="p-4 font-bold text-center text-[#0F3D3E]">{p.images?.length || 0}</td>
                                              <td className="p-4">
                                                  <div className="text-xs text-orange-600 font-bold flex items-center gap-1"><User size={10} className="text-orange-500" /> {p.vendor_contact_person}</div>
                                                  <div className="text-[10px] text-emerald-600 font-medium flex items-center gap-1"><Mail size={10} className="text-emerald-500" /> {p.vendor_email}</div>
@@ -390,11 +445,17 @@ export const EcommerceExport: React.FC = () => {
                                      </div>
                                      
                                      <h4 className="font-serif font-bold text-[#0F3D3E] leading-tight mb-1">{p.product_name}</h4>
-                                     <p className="text-[10px] text-gray-400 mb-3">{p.product_name_ar} &bull; {p.brand}</p>
+                                     <p className="text-[10px] text-gray-400 mb-3">{p.product_name_ar} &bull; {p.brand} &bull; {p.images?.length || 0} Images</p>
                                      
-                                     <div className="flex items-center gap-2 text-[10px] text-gray-500 bg-white p-2 rounded border border-gray-100 shadow-sm">
-                                        <User size={12} className="text-orange-400" />
-                                        <span>Point of Contact: <span className="font-bold text-[#0F3D3E]">{p.vendor_contact_person}</span></span>
+                                     <div className="bg-[#F0F4F4] p-3 rounded-lg text-xs space-y-2 border border-blue-100/50 mt-2">
+                                        <div className="flex items-center gap-2">
+                                            <User size={12} className="text-orange-500" /> 
+                                            <span className="font-bold text-[#0F3D3E]">{p.vendor_contact_person || 'N/A'}</span>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-2 text-[10px]">
+                                            <div className="flex items-center gap-1 text-emerald-600 truncate"><Mail size={10} /> {p.vendor_email}</div>
+                                            <div className="flex items-center gap-1 text-blue-600 truncate"><Phone size={10} /> {p.vendor_mobile}</div>
+                                        </div>
                                      </div>
                                  </div>
                              ))
@@ -409,7 +470,8 @@ export const EcommerceExport: React.FC = () => {
                                      <th className="p-4 font-bold">Item Code</th>
                                      <th className="p-4 font-bold">Product Name</th>
                                      <th className="p-4 font-bold">Brand</th>
-                                     <th className="p-4 font-bold">Contact</th>
+                                     <th className="p-4 font-bold">Images</th>
+                                     <th className="p-4 font-bold">Vendor Contact</th>
                                      <th className="p-4 font-bold text-center">Status</th>
                                  </tr>
                              </thead>
@@ -425,8 +487,11 @@ export const EcommerceExport: React.FC = () => {
                                                  <div className="text-[10px] text-gray-400">{p.product_name_ar}</div>
                                              </td>
                                              <td className="p-4 font-bold text-[#0F3D3E]">{p.brand}</td>
+                                             <td className="p-4 font-bold text-center text-[#0F3D3E]">{p.images?.length || 0}</td>
                                              <td className="p-4">
-                                                 <div className="text-xs text-orange-600 font-bold">{p.vendor_contact_person}</div>
+                                                 <div className="text-xs text-orange-600 font-bold flex items-center gap-1"><User size={10} className="text-orange-500" /> {p.vendor_contact_person}</div>
+                                                 <div className="text-[10px] text-emerald-600 font-medium flex items-center gap-1"><Mail size={10} className="text-emerald-500" /> {p.vendor_email}</div>
+                                                 <div className="text-[10px] text-blue-600 font-medium flex items-center gap-1"><Phone size={10} className="text-blue-500" /> {p.vendor_mobile}</div>
                                              </td>
                                              <td className="p-4 text-center">
                                                 <div className="inline-flex items-center gap-1 px-2 py-1 bg-emerald-100 text-emerald-700 rounded-full text-[10px] font-bold uppercase tracking-wider">

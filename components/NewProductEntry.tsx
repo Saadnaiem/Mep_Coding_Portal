@@ -55,7 +55,23 @@ export const NewProductEntry: React.FC<NewProductEntryProps> = ({ onAddProduct, 
     erp_item_code: '',
     
     // New Fees
-    product_listing_fees: ''
+    product_listing_fees: '',
+
+    // E-Commerce Assets
+    short_description_en: '',
+    short_description_ar: '',
+    brand_ar: '',
+    storage_condition_ar: '',
+    composition_en: '',
+    composition_ar: '',
+    indication_en: '',
+    indication_ar: '',
+    how_to_use_en: '',
+    how_to_use_ar: '',
+    side_effects_en: '',
+    side_effects_ar: '',
+    tags_filters: '',
+    suggested_filters: ''
   });
 
   const [productImages, setProductImages] = useState<string[]>(Array(6).fill(''));
@@ -224,6 +240,23 @@ export const NewProductEntry: React.FC<NewProductEntryProps> = ({ onAddProduct, 
       product_listing_fees: productForm.product_listing_fees,
       item_group: productForm.item_group,
       item_sub_group: productForm.item_sub_group,
+      
+      // E-Commerce Assets
+      short_description_en: productForm.short_description_en,
+      short_description_ar: productForm.short_description_ar,
+      brand_ar: productForm.brand_ar,
+      storage_condition_ar: productForm.storage_condition_ar,
+      composition_en: productForm.composition_en,
+      composition_ar: productForm.composition_ar,
+      indication_en: productForm.indication_en,
+      indication_ar: productForm.indication_ar,
+      how_to_use_en: productForm.how_to_use_en,
+      how_to_use_ar: productForm.how_to_use_ar,
+      side_effects_en: productForm.side_effects_en,
+      side_effects_ar: productForm.side_effects_ar,
+      tags_filters: productForm.tags_filters,
+      suggested_filters: productForm.suggested_filters,
+
       margin: (productForm.cost && productForm.retail && parseFloat(productForm.retail) > 0) 
             ? parseFloat(((1 - (parseFloat(productForm.cost) / parseFloat(productForm.retail))) * 100).toFixed(2)) 
             : 0,
@@ -337,6 +370,32 @@ export const NewProductEntry: React.FC<NewProductEntryProps> = ({ onAddProduct, 
                      <Input label="Buyer (Optional)" name="buyer" placeholder="Name" value={productForm.buyer} onChange={handleFieldChange} />
                      <Input label="Product Listing Fees (Optional)" name="product_listing_fees" placeholder="Annual or One-time Fee" value={productForm.product_listing_fees} onChange={handleFieldChange} />
                   </div>
+                </div>
+             </div>
+
+             <div className="pt-6 border-t border-gray-100 mt-6">
+                <h4 className="font-serif font-bold text-[#0F3D3E] text-sm uppercase tracking-widest mb-4">E-Commerce Assets</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <Input label="Short Description (EN)" name="short_description_en" placeholder="Marketing hook..." value={productForm.short_description_en} onChange={handleFieldChange} />
+                    <Input label="Short Description (AR)" name="short_description_ar" placeholder="الوصف المختصر..." value={productForm.short_description_ar} onChange={handleFieldChange} />
+
+                    <Input label="Brand Name (AR)" name="brand_ar" placeholder="اسم العلامة التجارية..." value={productForm.brand_ar} onChange={handleFieldChange} />
+                    <Input label="Storage Condition (AR)" name="storage_condition_ar" placeholder="ظروف التخزين..." value={productForm.storage_condition_ar} onChange={handleFieldChange} />
+
+                    <Input label="Composition (EN)" name="composition_en" placeholder="Active ingredients..." value={productForm.composition_en} onChange={handleFieldChange} />
+                    <Input label="Composition (AR)" name="composition_ar" placeholder="المكونات..." value={productForm.composition_ar} onChange={handleFieldChange} />
+
+                    <Input label="Indication (EN)" name="indication_en" placeholder="Uses..." value={productForm.indication_en} onChange={handleFieldChange} />
+                    <Input label="Indication (AR)" name="indication_ar" placeholder="دواعي الاستعمال..." value={productForm.indication_ar} onChange={handleFieldChange} />
+
+                    <Input label="How To Use (EN)" name="how_to_use_en" placeholder="Instructions..." value={productForm.how_to_use_en} onChange={handleFieldChange} />
+                    <Input label="How To Use (AR)" name="how_to_use_ar" placeholder="طريقة الاستخدام..." value={productForm.how_to_use_ar} onChange={handleFieldChange} />
+
+                    <Input label="Side Effects / Warnings (EN)" name="side_effects_en" placeholder="Safety info..." value={productForm.side_effects_en} onChange={handleFieldChange} />
+                    <Input label="Side Effects / Warnings (AR)" name="side_effects_ar" placeholder="الآثار الجانبية / تحذيرات..." value={productForm.side_effects_ar} onChange={handleFieldChange} />
+
+                    <Input label="Tags / Filters" name="tags_filters" placeholder="Comma separated tags..." value={productForm.tags_filters} onChange={handleFieldChange} />
+                    <Input label="Suggested Filters (Beauty)" name="suggested_filters" placeholder="For beauty products..." value={productForm.suggested_filters} onChange={handleFieldChange} />
                 </div>
              </div>
 

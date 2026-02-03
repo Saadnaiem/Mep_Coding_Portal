@@ -89,6 +89,20 @@ export interface Vendor {
   new_vendor_registration_fees?: string;
 }
 
+export interface Delegation {
+  id: string;
+  delegator_id: string; // The person going on vacation
+  delegatee_id: string; // The person receiving authority
+  start_date: string;
+  end_date: string;
+  active: boolean;
+  notes?: string;
+  created_at?: string;
+  // Joined fields
+  delegator?: Profile;
+  delegatee?: Profile;
+}
+
 export interface ProductRequest {
   id: string;
   request_number: string;
@@ -156,6 +170,23 @@ export interface Product {
   margin?: number;
   // New Fees
   product_listing_fees?: string;
+
+  // E-Commerce Assets
+  short_description_en?: string;
+  short_description_ar?: string;
+  brand_ar?: string;
+  storage_condition_ar?: string;
+  composition_en?: string;
+  composition_ar?: string;
+  indication_en?: string;
+  indication_ar?: string;
+  how_to_use_en?: string;
+  how_to_use_ar?: string;
+  side_effects_en?: string;
+  side_effects_ar?: string;
+  tags_filters?: string;
+  suggested_filters?: string;
+  
   images?: string[];
 }
 

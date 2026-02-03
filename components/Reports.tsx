@@ -3,7 +3,8 @@ import { Card, Button, Input, Select } from './UI'; // Reuse UI components
 import { db } from '../services/database';
 import { ProductRequest, Product, RequestStatus } from '../types';
 import { Download, Calendar, Filter, Search } from 'lucide-react';
-import * as XLSX from 'xlsx'; // Need to check if installed, if not fallback to CSV
+import * as ExcelJS from 'exceljs';
+import { saveAs } from 'file-saver';
 
 // Interfaces
 interface ReportItem {
@@ -21,14 +22,31 @@ interface ReportItem {
     category: string;
     sub_category: string;
     class_name: string;
-    description_en: string;
-    description_ar: string;
+    description_en: string; // Product Name
+    description_ar: string; // Product Name Ar
     item_code: string;
     cost_price: number;
     sales_price: number;
     margin: number;
     status: string;
     images?: string[];
+
+    // New E-Commerce Fields
+    short_description_en?: string;
+    short_description_ar?: string;
+    brand_ar?: string;
+    storage_condition?: string;
+    storage_condition_ar?: string;
+    composition_en?: string;
+    composition_ar?: string;
+    indication_en?: string;
+    indication_ar?: string;
+    how_to_use_en?: string;
+    how_to_use_ar?: string; // Corrected field name
+    side_effects_en?: string;
+    side_effects_ar?: string;
+    tags_filters?: string;
+    suggested_filters?: string;
 }
 
 export const Reports: React.FC = () => {
@@ -85,14 +103,43 @@ export const Reports: React.FC = () => {
                     sales_price: retail,
                     margin: parseFloat(margin.toFixed(2)),
                     status: req?.status || 'draft',
-                    images: p.images || []
+                    images: p.images || [],
+
+                    // New E-Commerce fields
+                    short_description_en: p.short_description_en,
+                    short_description_ar: p.short_description_ar,
+                    brand_ar: p.brand_ar,
+                    storage_condition: p.storage_condition,
+                    storage_condition_ar: p.storage_condition_ar,
+                    composition_en: p.composition_en,
+                    composition_ar: p.composition_ar,
+                    indication_en: p.indication_en,
+                    indication_ar: p.indication_ar,
+                    how_to_use_en: p.how_to_use_en,
+                    how_to_use_ar: p.how_to_use_ar,
+                    side_effects_en: p.side_effects_en,
+                    side_effects_ar: p.side_effects_ar,
+                    tags_filters: p.tags_filters,
+                    suggested_filters: p.suggested_filters
                 };
             });
 
-            // Sort by date descending
-            joinedData.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+            // Deduplicate logic: Filter out entries that have the exact same Request ID and Product Name
+            // This handles cases where double-submission might have occurred in the DB
+            const uniqueMap = new Map();
+            joinedData.forEach(item => {
+                // Key using combination of Request ID and Product Name (normalized)
+                const key = `${item.request_id}_${item.description_en.trim().toLowerCase()}`;
+                if (!uniqueMap.has(key)) {
+                    uniqueMap.set(key, item);
+                }
+            });
+            const uniqueData = Array.from(uniqueMap.values());
 
-            setRawData(joinedData);
+            // Sort by date descending
+            uniqueData.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+            setRawData(uniqueData);
         } catch (error) {
             console.error("Failed to load report data", error);
         } finally {
@@ -137,46 +184,96 @@ export const Reports: React.FC = () => {
         return Array.from(unique).sort();
     }, [rawData]);
 
-    // Export to Excel/CSV
-    const handleExport = () => {
-        const csvContent = [
-            ['Registration Date', 'Vendor', 'Vendor Type', 'Email', 'Contact Person', 'Mobile', 'Division', 'Department', 'Category', 'Sub-Category', 'Class', 'Brand', 'Item Code', 'Description (EN)', 'Description (AR)', 'Cost Price', 'Sales Price', 'Margin %'],
-            ...filteredData.map(item => [
-                new Date(item.created_at).toLocaleDateString(),
-                `"${item.vendor_name}"`, // Quote CSV fields for safety
-                `"${item.vendor_type}"`,
-                `"${item.email}"`,
-                `"${item.contact_person}"`,
-                `"${item.contact_mobile}"`,
-                `"${item.division}"`,
-                `"${item.department}"`,
-                `"${item.category}"`,
-                `"${item.sub_category}"`,
-                `"${item.class_name}"`,
-                `"${item.brand}"`,
-                `"${item.item_code}"`,
-                `"${item.description_en}"`,
-                `"${item.description_ar}"`,
-                item.cost_price.toFixed(2),
-                item.sales_price.toFixed(2),
-                `${item.margin}%`
-            ])
-        ].map(e => e.join(",")).join("\n");
+    // Export to Excel (Master Report)
+    const handleExport = async () => {
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet("Master Report");
 
-        // Add Byte Order Mark (BOM) for Excel UTF-8 compatibility
-        const BOM = "\uFEFF";
-        const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement("a");
-        const url = URL.createObjectURL(blob);
-        link.setAttribute("href", url);
-        link.setAttribute("download", `MEP_Product_Report_${new Date().toISOString().split('T')[0]}.csv`);
-        link.style.visibility = 'hidden';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        const headers = [
+            'Registration Date', 'Vendor', 'Vendor Type', 'Email', 'Contact Person', 'Mobile', 
+            'Division', 'Department', 'Category', 'Sub-Category', 'Class', 
+            'Brand', 'Item Code', 'Description (EN)', 'Description (AR)', 
+            'Cost Price', 'Sales Price', 'Margin %',
+            // Extended E-Commerce Fields
+            'Brand (AR)', 'Short Desc (EN)', 'Short Desc (AR)',
+            'Storage (EN)', 'Storage (AR)', 'Composition (EN)', 'Composition (AR)',
+            'Indication (EN)', 'Indication (AR)', 'How To Use (EN)', 'How To Use (AR)',
+            'Side Effects (EN)', 'Side Effects (AR)'
+        ];
+
+        // Header Style
+        const headerRow = worksheet.addRow(headers);
+        headerRow.font = { bold: true };
+        headerRow.eachCell(cell => {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEEEEEE' } };
+            cell.border = { bottom: { style: 'thin' } };
+        });
+
+        filteredData.forEach(item => {
+            const row = [
+                new Date(item.created_at).toLocaleDateString(),
+                item.vendor_name,
+                item.vendor_type,
+                item.email,
+                item.contact_person,
+                item.contact_mobile,
+                item.division,
+                item.department,
+                item.category,
+                item.sub_category,
+                item.class_name,
+                item.brand,
+                item.item_code,
+                item.description_en,
+                item.description_ar,
+                item.cost_price,
+                item.sales_price,
+                `${item.margin}%`,
+                // Extended
+                item.brand_ar || '',
+                item.short_description_en || '',
+                item.short_description_ar || '',
+                item.storage_condition || '',
+                item.storage_condition_ar || '',
+                item.composition_en || '',
+                item.composition_ar || '',
+                item.indication_en || '',
+                item.indication_ar || '',
+                item.how_to_use_en || '',
+                item.how_to_use_ar || '',
+                item.side_effects_en || '',
+                item.side_effects_ar || ''
+            ];
+            worksheet.addRow(row);
+        });
+
+        // Column Settings
+        worksheet.columns.forEach((column, i) => {
+            const isTextColumn = [
+                13, 14, // Description EN/AR
+                19, 20, // Short Desc
+                21, 22, // Storage
+                23, 24, // Composition
+                25, 26, // Indication
+                27, 28, // How to Use
+                29, 30  // Side Effects
+            ].includes(i);
+
+            if (isTextColumn) {
+                column.width = 40;
+                column.alignment = { wrapText: true, vertical: 'top', horizontal: 'left' };
+            } else {
+                const headerText = headers[i] || '';
+                column.width = Math.max(headerText.length + 5, 15);
+                column.alignment = { vertical: 'top', horizontal: 'left' };
+            }
+        });
+
+        const buffer = await workbook.xlsx.writeBuffer();
+        saveAs(new Blob([buffer]), `Al_Habib_Master_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
     };
 
-    const handleEcommerceExport = () => {
+    const handleEcommerceExport = async () => {
         // Filter: Status completed AND item_code exists AND not 'N/A'
         const dataToExport = rawData.filter(item => 
             item.status === 'completed' && 
@@ -189,51 +286,117 @@ export const Reports: React.FC = () => {
             return;
         }
 
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet("E-Commerce Form");
+
         const headers = [
             'SKU UBC/GTIN', 'NAME/ DESCRIPTION_US', 'NAME/ DESCRIPTION_AR', 'BRAND Name_US', 
             'BRAND Name_AR', 'SHORT DESCRIPTION_US', 'SHORT DESCRIPTION_AR', 'STORAGE_US', 
             'STORAGE_AR', 'COMPOSITION_US', 'COMPOSITION_AR', 'INDICATION_AR', 'INDICATION_US', 
             'HOW_TO_USE_US', 'HOW_TO_USE_AR', 'POSSIBLE_SIDE_EFFECTS/WARNINGS_US', 
             'POSSIBLE_SIDE_EFFECTS/WARNINGS_AR', 'Category', 'Group', 'Subgroup', 
-            'Tags/Filters  (*Tags can be chosen based on the filters from column V to AG, with comma seprated*)', 
+            'Tags/Filters  (Tags can be chosen based on the filters from column V to AG, with comma seprated)', 
             'Suggested Filters in BEAUTY',
             'Division', 'Department', 'Category (POP)', 'Sub-Category (POP)', 'Class',
             'Image 1', 'Image 2', 'Image 3', 'Image 4', 'Image 5', 'Image 6'
         ];
 
-        const rows = dataToExport.map(item => {
-            const row = new Array(headers.length).fill('');
-            row[0] = item.item_code; // SKU UBC/GTIN
-            row[1] = item.description_en; // NAME/ DESCRIPTION_US
-            row[2] = item.description_ar; // NAME/ DESCRIPTION_AR
-            row[3] = item.brand; // BRAND Name_US
-            row[4] = ''; // BRAND Name_AR
+        // Add Header Row
+        const headerRow = worksheet.addRow(headers);
+        headerRow.font = { bold: true };
+        headerRow.eachCell((cell) => {
+            cell.fill = {
+                type: 'pattern',
+                pattern: 'solid',
+                fgColor: { argb: 'FFEBF1F1' }
+            };
+            cell.border = {
+                bottom: { style: 'thin' }
+            };
+        });
+
+        dataToExport.forEach(item => {
+            const rowData: any[] = new Array(headers.length).fill('');
+            rowData[0] = item.item_code; // SKU UBC/GTIN
+            rowData[1] = item.description_en; // NAME/ DESCRIPTION_US
+            rowData[2] = item.description_ar; // NAME/ DESCRIPTION_AR
+            rowData[3] = item.brand; // BRAND Name_US
+            rowData[4] = item.brand_ar || ''; // BRAND Name_AR
             
-            // Note: Template columns 17 (Category), 18 (Group), 19 (Subgroup) are left empty
+            // Rich Text Fields
+            rowData[5] = item.short_description_en || '';
+            rowData[6] = item.short_description_ar || '';
+            rowData[7] = item.storage_condition || ''; // STORAGE_US
+            rowData[8] = item.storage_condition_ar || '';
+            rowData[9] = item.composition_en || '';
+            rowData[10] = item.composition_ar || '';
+            rowData[11] = item.indication_ar || '';
+            rowData[12] = item.indication_en || '';
+            rowData[13] = item.how_to_use_en || '';
+            rowData[14] = item.how_to_use_ar || '';
+            rowData[15] = item.side_effects_en || '';
+            rowData[16] = item.side_effects_ar || '';
             
+            // Tags
+            rowData[20] = item.tags_filters || '';
+            rowData[21] = item.suggested_filters || '';
+
             // Append 5-level hierarchy
-            row[22] = item.division;     // Division
-            row[23] = item.department;   // Department
-            row[24] = item.category;     // Category (POP)
-            row[25] = item.sub_category; // Sub-Category (POP)
-            row[26] = item.class_name;   // Class
+            rowData[22] = item.division;     // Division
+            rowData[23] = item.department;   // Department
+            rowData[24] = item.category;     // Category (POP)
+            rowData[25] = item.sub_category; // Sub-Category (POP)
+            rowData[26] = item.class_name;   // Class
+
+            const newRow = worksheet.addRow(rowData);
 
             // Images
             if (item.images && item.images.length > 0) {
                 item.images.forEach((img, idx) => {
                     if (idx < 6) {
-                        row[27 + idx] = img;
+                        try {
+                            const colIndex = 28 + idx; // 1-based index for getCell
+                            
+                            const extMatch = img.match(/\.([a-zA-Z0-9]+)(\?|$)/);
+                            const ext = extMatch ? extMatch[1] : 'jpg';
+                            const suffix = idx === 0 ? '' : `_${idx + 1}`;
+                            const fileName = `${item.item_code}${suffix}.${ext}`;
+                            
+                            const separator = img.includes('?') ? '&' : '?';
+                            const downloadUrl = `${img}${separator}download=${encodeURIComponent(fileName)}`;
+
+                            const cell = newRow.getCell(colIndex);
+                            cell.value = { text: fileName, hyperlink: downloadUrl };
+                            cell.font = { color: { argb: 'FF0000FF' }, underline: true };
+                        } catch (e) {
+                            newRow.getCell(28 + idx).value = img;
+                        }
                     }
                 });
             }
-
-            return row;
         });
 
-        const workbook = XLSX.utils.book_new();
-        const worksheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
-        XLSX.utils.book_append_sheet(workbook, worksheet, "E-Commerce Form");
-        XLSX.writeFile(workbook, `Ecommerce_Form_${new Date().toISOString().split('T')[0]}.xlsx`);
+        // Set Column Widths and Alignment (Wrap Text)
+        worksheet.columns.forEach((column, i) => {
+             // Text heavy columns indices (0-based): 5,6,7,8,9,10,11,12,13,14,15,16,20,21
+             const isTextColumn = [5,6,7,8,9,10,11,12,13,14,15,16,20,21].includes(i);
+             const isImageColumn = i >= 27; // Images
+
+             if (isTextColumn) {
+                 column.width = 50;
+                 column.alignment = { wrapText: true, vertical: 'top', horizontal: 'left' };
+             } else if (isImageColumn) {
+                 column.width = 25;
+                 column.alignment = { vertical: 'top', horizontal: 'left' };
+             } else {
+                 const headerText = headers[i] || '';
+                 column.width = Math.max(headerText.length + 5, 20);
+                 column.alignment = { vertical: 'top', horizontal: 'left' };
+             }
+        });
+
+        const buffer = await workbook.xlsx.writeBuffer();
+        saveAs(new Blob([buffer]), `Ecommerce_Form_${new Date().toISOString().split('T')[0]}.xlsx`);
     };
 
     return (
@@ -248,7 +411,7 @@ export const Reports: React.FC = () => {
                         <Download className="mr-2" size={18} /> E-Commerce Form
                     </Button>
                     <Button onClick={handleExport} className="w-full sm:w-auto px-6 h-12 bg-[#0F3D3E] text-white hover:bg-[#C5A065] shadow-lg text-xs md:text-sm">
-                        <Download className="mr-2" size={18} /> Export CSV
+                        <Download className="mr-2" size={18} /> Export Excel
                     </Button>
                 </div>
             </div>
@@ -366,7 +529,7 @@ export const Reports: React.FC = () => {
                                         </td>
                                         <td className="p-4">
                                             <div className="flex flex-col gap-1 text-[10px]">
-                                                <span className="font-bold text-[#0F3D3E] bg-[#F0F4F4] px-2 py-0.5 rounded w-fit">{item.division}</span>
+                                                <span className="font-bold text-[#0F3D3E] bg-[#F0F4F4] px-2 py-0.5 rounded w-fit whitespace-nowrap">{item.division}</span>
                                                 <span className="text-gray-500 pl-1">› {item.department}</span>
                                                 <span className="text-gray-500 pl-1">› {item.category}</span>
                                                 <span className="text-gray-500 pl-1">› {item.sub_category}</span>

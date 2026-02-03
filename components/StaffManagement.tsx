@@ -1,19 +1,29 @@
 import React, { useState, useEffect } from 'react';
-import { RotateCw, Mail, Check } from 'lucide-react';
-import { EmployeeRole, Profile } from '../types';
+import { RotateCw, Mail, Check, Trash2, Calendar, UserPlus } from 'lucide-react';
+import { EmployeeRole, Profile, Delegation } from '../types';
 import { ROLE_LABELS } from '../constants';
 import { db } from '../services/database';
 import { supabase } from '../services/supabase'; 
-import { Card, Button, Badge } from './UI';
+import { Card, Button, Badge, Input, Select } from './UI';
 
 export const StaffManagement = () => {
   const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [delegations, setDelegations] = useState<Delegation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [delegationLoading, setDelegationLoading] = useState(false);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+
+  const [newDelegation, setNewDelegation] = useState({
+      delegatorId: '',
+      delegateeId: '',
+      startDate: '',
+      endDate: ''
+  });
 
   // Load data on mount
   useEffect(() => {
     loadEmployees();
+    loadDelegations();
   }, []);
 
   const loadEmployees = async () => {
@@ -21,6 +31,42 @@ export const StaffManagement = () => {
     const data = await db.fetchEmployees();
     setProfiles(data);
     setLoading(false);
+  };
+  
+  const loadDelegations = async () => {
+      setDelegationLoading(true);
+      const data = await db.fetchDelegations();
+      setDelegations(data);
+      setDelegationLoading(false);
+  };
+
+  const handleCreateDelegation = async () => {
+      if (!newDelegation.delegatorId || !newDelegation.delegateeId || !newDelegation.startDate || !newDelegation.endDate) {
+          alert('Please select delegator, delegatee and dates.');
+          return;
+      }
+      if (newDelegation.delegatorId === newDelegation.delegateeId) {
+          alert('Delegator and Delegatee cannot be the same person.');
+          return;
+      }
+
+      await db.createDelegation({
+          delegator_id: newDelegation.delegatorId,
+          delegatee_id: newDelegation.delegateeId,
+          start_date: new Date(newDelegation.startDate + 'T00:00:00').toISOString(),
+          end_date: new Date(newDelegation.endDate + 'T23:59:59').toISOString(), // Ensure full end day coverage
+          active: true
+      });
+      
+      alert('Authority delegation created successfully.');
+      setNewDelegation({ delegatorId: '', delegateeId: '', startDate: '', endDate: '' });
+      loadDelegations();
+  };
+
+  const handleDeleteDelegation = async (id: string) => {
+      if(!confirm("Revoke this delegation of authority?")) return;
+      await db.deleteDelegation(id);
+      loadDelegations();
   };
 
   const handleRoleUpdate = async (userId: string, newRole: EmployeeRole) => {
@@ -76,12 +122,97 @@ export const StaffManagement = () => {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-gray-100 pb-6 gap-4">
         <div>
           <h2 className="text-3xl md:text-4xl font-serif font-black text-[#0F3D3E] tracking-tight mb-2">Access Management</h2>
-          <p className="text-[#C5A065] text-sm font-bold tracking-wide">Manage internal users and role assignments</p>
+          <p className="text-[#C5A065] text-sm font-bold tracking-wide">Manage internal users, roles, and vacation delegations</p>
         </div>
-        <Button variant="outline" onClick={loadEmployees} className="w-full md:w-auto !py-2 !px-4">
-             <RotateCw size={14} className={loading ? "animate-spin" : ""} /> Refresh List
+        <Button variant="outline" onClick={() => { loadEmployees(); loadDelegations(); }} className="w-full md:w-auto !py-2 !px-4">
+             <RotateCw size={14} className={loading ? "animate-spin" : ""} /> Refresh Data
         </Button>
       </div>
+      
+      {/* DELEGATION SYSTEM */}
+      <Card title="Authority Delegation (Vacation Setup)" className="h-fit border-t-4 border-t-[#C5A065]">
+         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+             {/* Form */}
+             <div className="bg-[#F0F4F4]/50 p-6 rounded-xl border border-gray-100 space-y-4">
+                 <h4 className="font-bold text-[#0F3D3E] flex items-center gap-2 mb-4"><UserPlus size={18} /> Add New Delegation</h4>
+                 <div>
+                     <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1">Delegator (Leaving)</label>
+                     <select 
+                        className="w-full p-2 border border-gray-200 rounded-lg text-xs"
+                        value={newDelegation.delegatorId}
+                        onChange={e => setNewDelegation({...newDelegation, delegatorId: e.target.value})}
+                     >
+                         <option value="">Select Employee...</option>
+                         {profiles.sort((a,b) => a.full_name.localeCompare(b.full_name)).map(p => (
+                             <option key={p.id} value={p.id}>{p.full_name} ({ROLE_LABELS[p.role as EmployeeRole] || p.role})</option>
+                         ))}
+                     </select>
+                 </div>
+                 <div className="bg-[#C5A065]/10 p-2 rounded flex justify-center"><div className="w-[1px] h-4 bg-[#C5A065]"></div></div>
+                 <div>
+                     <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1">Delegatee (Acting As)</label>
+                     <select 
+                        className="w-full p-2 border border-gray-200 rounded-lg text-xs"
+                        value={newDelegation.delegateeId}
+                        onChange={e => setNewDelegation({...newDelegation, delegateeId: e.target.value})}
+                     >
+                         <option value="">Select Employee...</option>
+                         {profiles.sort((a,b) => a.full_name.localeCompare(b.full_name)).map(p => (
+                             <option key={p.id} value={p.id}>{p.full_name} ({ROLE_LABELS[p.role as EmployeeRole] || p.role})</option>
+                         ))}
+                     </select>
+                 </div>
+                 <div className="grid grid-cols-2 gap-2">
+                     <div>
+                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1">Start Date</label>
+                        <input type="date" className="w-full p-2 border border-gray-200 rounded-lg text-xs" value={newDelegation.startDate} onChange={e => setNewDelegation({...newDelegation, startDate: e.target.value})} />
+                     </div>
+                     <div>
+                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1">End Date</label>
+                        <input type="date" className="w-full p-2 border border-gray-200 rounded-lg text-xs" value={newDelegation.endDate} onChange={e => setNewDelegation({...newDelegation, endDate: e.target.value})} />
+                     </div>
+                 </div>
+                 <Button className="w-full bg-[#0F3D3E] text-white mt-2" onClick={handleCreateDelegation}>Create Delegation Rule</Button>
+             </div>
+
+             {/* List */}
+             <div className="lg:col-span-2">
+                 <h4 className="font-bold text-[#0F3D3E] flex items-center gap-2 mb-4"><Calendar size={18} /> Active & Scheduled Delegations</h4>
+                 {delegationLoading ? <p className="text-gray-400 text-sm">Loading...</p> : delegations.length === 0 ? <p className="text-gray-400 text-sm italic">No active delegations found.</p> : (
+                     <div className="space-y-3">
+                         {delegations.map(d => {
+                            const isActive = new Date() >= new Date(d.start_date) && new Date() <= new Date(d.end_date);
+                            return (
+                                <div key={d.id} className={`p-4 rounded-xl border flex justify-between items-center ${isActive ? 'bg-green-50 border-green-200' : 'bg-white border-gray-100'}`}>
+                                    <div className="flex items-center gap-4">
+                                        <div className="flex flex-col items-center min-w-[120px]">
+                                            <span className="text-[10px] font-bold uppercase tracking-widest text-[#0F3D3E] mb-1">Delegator</span>
+                                            <span className="font-bold text-[#0F3D3E] text-sm text-center">{d.delegator?.full_name}</span>
+                                            <span className="text-[9px] text-gray-400">{ROLE_LABELS[d.delegator?.role as EmployeeRole] || d.delegator?.role}</span>
+                                        </div>
+                                        <div className="text-[#C5A065]">→</div>
+                                        <div className="flex flex-col items-center min-w-[120px]">
+                                            <span className="text-[10px] font-bold uppercase tracking-widest text-[#0F3D3E] mb-1">Delegatee</span>
+                                            <span className="font-bold text-[#0F3D3E] text-sm text-center">{d.delegatee?.full_name}</span>
+                                            <span className="text-[9px] text-gray-400">{ROLE_LABELS[d.delegatee?.role as EmployeeRole] || d.delegatee?.role}</span>
+                                        </div>
+                                    </div>
+                                    <div className="text-right">
+                                        <div className="bg-white px-3 py-1 rounded border border-gray-200 text-[10px] font-mono text-gray-600 mb-2">
+                                            {new Date(d.start_date).toLocaleDateString()} — {new Date(d.end_date).toLocaleDateString()}
+                                        </div>
+                                        <button onClick={() => handleDeleteDelegation(d.id)} className="text-red-500 hover:text-red-700 text-xs font-bold flex items-center gap-1 justify-end ml-auto">
+                                            <Trash2 size={12} /> Revoke
+                                        </button>
+                                    </div>
+                                </div>
+                            );
+                         })}
+                     </div>
+                 )}
+             </div>
+         </div>
+      </Card>
       
       <Card title="Active Personnel Directory" className="h-full">
           {loading ? (
