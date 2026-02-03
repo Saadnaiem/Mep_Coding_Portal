@@ -294,7 +294,7 @@ export const NewProductEntry: React.FC<NewProductEntryProps> = ({ onAddProduct, 
         </Card>
 
         <Card title="Product Listing Specifications" className="border-t-4 border-t-[#C5A065]">
-             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+             <div className="grid grid-cols-1 md:grid-cols-[2fr_3fr_3fr] gap-6">
                 <div className="space-y-6">
                   <h4 className="font-serif font-bold text-[#0F3D3E] text-sm uppercase tracking-widest mb-4 border-b border-[#C5A065]/30 pb-2">Basic Information</h4>
                   <Input label="Brand Name (English)" name="brand" placeholder="e.g. Panadol" value={productForm.brand} onChange={handleFieldChange} />

@@ -1,10 +1,10 @@
--- Fix Assignments for mohamed.almogy@drsulaimanalhabib.com
+-- Fix Assignments for mohamed.elmogy@drsulaimanalhabib.com
 -- Assigns him as Category Manager for WELLNESS division so he can see tasks.
 
 DO $$
 DECLARE
   target_user_id uuid;
-  user_email text := 'mohamed.almogy@drsulaimanalhabib.com';
+  user_email text := 'mohamed.elmogy@drsulaimanalhabib.com';
 BEGIN
   -- 1. Get User ID from Auth
   SELECT id INTO target_user_id FROM auth.users WHERE email = user_email;
@@ -14,7 +14,7 @@ BEGIN
   ELSE
       -- 2. Ensure Profile Exists & is Category Manager
       INSERT INTO public.profiles (id, email, full_name, role, department, active)
-      VALUES (target_user_id, user_email, 'Mohamed Almogy', 'category_manager', 'Category Management', true)
+      VALUES (target_user_id, user_email, 'Mohamed Elmogy', 'category_manager', 'Category Management', true)
       ON CONFLICT (id) DO UPDATE SET
           role = 'category_manager',
           department = 'Category Management',

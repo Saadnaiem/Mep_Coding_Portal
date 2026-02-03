@@ -2544,7 +2544,7 @@ Al Habib Pharmacy Team`;
                         <h5 className="font-serif font-bold text-[#0F3D3E] text-sm uppercase tracking-widest mb-6 flex items-center gap-2">
                              <span className="w-8 h-1 bg-[#C5A065] rounded-full"></span>Pharmacy Listing Specifications
                         </h5>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
+                        <div className="grid grid-cols-1 md:grid-cols-[2fr_3fr_3fr] gap-12">
                            
                            {/* Column 1: Basic Information */}
                            <div className="space-y-6 border-r border-gray-50 md:pr-6">
