@@ -53,3 +53,4 @@ CREATE TRIGGER set_request_number_trigger
 BEFORE INSERT ON product_requests
 FOR EACH ROW
 EXECUTE FUNCTION generate_request_number();
+    

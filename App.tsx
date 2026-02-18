@@ -2223,8 +2223,8 @@ Al Habib Pharmacy Team`;
 
   const RequestDetails = () => {
     const isCorrection = (currentRequest?.status === 'vendor_revision_required' || currentRequest?.status === 'rejected') && activePortal === 'vendor';
-    // Allow editing if it's a correction OR if we are at Step 7 (ERP) and the user can take action
-    const isEditable = isCorrection || (isRequestActionable && currentRequest?.current_step === 7);
+    // Allow editing if it's a correction OR if we are at Step 7 (ERP) OR if it is Category Manager at Step 1 OR Super Admin
+    const isEditable = isCorrection || (isRequestActionable && currentRequest?.current_step === 7) || (isRequestActionable && (currentRequest?.current_step === 1 || currentUserEmployee?.role === 'super_admin'));
     
     const [assignedManagerName, setAssignedManagerName] = useState<string | null>(null);
     const [editableVendor, setEditableVendor] = useState<Partial<any>>({});
@@ -2328,7 +2328,33 @@ Al Habib Pharmacy Team`;
     // Using shared 'editableProducts' from Parent (App) state now, so changes persist for Action saving
 
     const handleProductChange = (id: string, field: string, value: any) => {
-        setEditableProducts(prev => prev.map(p => p.id === id ? { ...p, [field]: value } : p));
+        setEditableProducts(prev => prev.map(p => {
+             if (p.id !== id) return p;
+
+             const next = { ...p, [field]: value };
+
+             // Hierarchy Reset Logic
+             if (field === 'division') {
+                 next.department = '';
+                 next.category = '';
+                 next.sub_category = '';
+                 next.class_name = '';
+             }
+             if (field === 'department') {
+                 next.category = '';
+                 next.sub_category = '';
+                 next.class_name = '';
+             }
+             if (field === 'category') {
+                 next.sub_category = '';
+                 next.class_name = '';
+             }
+             if (field === 'sub_category') {
+                 next.class_name = '';
+             }
+             
+             return next;
+        }));
     };
 
     const handleResubmit = async () => {
@@ -2523,19 +2549,65 @@ Al Habib Pharmacy Team`;
                             <span className="w-8 h-1 bg-[#0F3D3E] rounded-full"></span>Product Hierarchy Selection
                         </h5>
                         <div className="grid grid-cols-2 md:grid-cols-5 gap-4 bg-[#F0F4F4] p-6 rounded-2xl border border-gray-100">
-                            {['division', 'department', 'category', 'sub_category', 'class_name'].map(field => (
-                                <div key={field}>
-                                    <p className="text-[10px] uppercase font-bold text-gray-400 mb-1">{field.replace('_', ' ')}</p>
-                                    {isEditable ? (
-                                        <EditableField 
-                                            value={p[field as keyof Product]} 
-                                            onChange={(newValue: any) => handleProductChange(p.id, field, newValue)}
-                                        />
-                                    ) : (
-                                        <p className="font-bold text-[#0F3D3E] text-xs break-words">{p[field as keyof Product]}</p>
-                                    )}
-                                </div>
-                            ))}
+                             {/* Division */}
+                             <div>
+                                <p className="text-[10px] uppercase font-bold text-gray-400 mb-1">Division</p>
+                                {isEditable ? (
+                                    <EditableField 
+                                        value={p.division} 
+                                        onChange={(val: any) => handleProductChange(p.id, 'division', val)}
+                                        options={PRODUCT_HIERARCHY.map(d => d.name).filter(n => n !== "Grand Total")}
+                                    />
+                                ) : <p className="font-bold text-[#0F3D3E] text-xs break-words">{p.division}</p>}
+                             </div>
+
+                             {/* Department */}
+                             <div>
+                                <p className="text-[10px] uppercase font-bold text-gray-400 mb-1">Department</p>
+                                {isEditable ? (
+                                    <EditableField 
+                                        value={p.department} 
+                                        onChange={(val: any) => handleProductChange(p.id, 'department', val)}
+                                        options={PRODUCT_HIERARCHY.find(d => d.name === p.division)?.children?.map(c => c.name) || []}
+                                    />
+                                ) : <p className="font-bold text-[#0F3D3E] text-xs break-words">{p.department}</p>}
+                             </div>
+
+                             {/* Category */}
+                             <div>
+                                <p className="text-[10px] uppercase font-bold text-gray-400 mb-1">Category</p>
+                                {isEditable ? (
+                                    <EditableField 
+                                        value={p.category} 
+                                        onChange={(val: any) => handleProductChange(p.id, 'category', val)}
+                                        options={PRODUCT_HIERARCHY.find(d => d.name === p.division)?.children?.find(d => d.name === p.department)?.children?.map(c => c.name) || []}
+                                    />
+                                ) : <p className="font-bold text-[#0F3D3E] text-xs break-words">{p.category}</p>}
+                             </div>
+
+                             {/* Sub Category */}
+                             <div>
+                                <p className="text-[10px] uppercase font-bold text-gray-400 mb-1">Sub Category</p>
+                                {isEditable ? (
+                                    <EditableField 
+                                        value={p.sub_category} 
+                                        onChange={(val: any) => handleProductChange(p.id, 'sub_category', val)}
+                                        options={PRODUCT_HIERARCHY.find(d => d.name === p.division)?.children?.find(d => d.name === p.department)?.children?.find(c => c.name === p.category)?.children?.map(s => s.name) || []}
+                                    />
+                                ) : <p className="font-bold text-[#0F3D3E] text-xs break-words">{p.sub_category}</p>}
+                             </div>
+
+                             {/* Class */}
+                             <div>
+                                <p className="text-[10px] uppercase font-bold text-gray-400 mb-1">Class</p>
+                                {isEditable ? (
+                                    <EditableField 
+                                        value={p.class_name} 
+                                        onChange={(val: any) => handleProductChange(p.id, 'class_name', val)}
+                                        options={PRODUCT_HIERARCHY.find(d => d.name === p.division)?.children?.find(d => d.name === p.department)?.children?.find(c => c.name === p.category)?.children?.find(s => s.name === p.sub_category)?.children?.map(cl => cl.name) || []}
+                                    />
+                                ) : <p className="font-bold text-[#0F3D3E] text-xs break-words">{p.class_name}</p>}
+                             </div>
                         </div>
                       </div>
 
