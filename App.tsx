@@ -3181,8 +3181,9 @@ Al Habib Pharmacy Team`;
         <div className="min-h-screen w-full bg-[#0F3D3E] flex items-center justify-center p-4 font-sans overflow-y-auto">
           <div className="w-full max-w-lg animate-in fade-in zoom-in-95 duration-700 flex flex-col my-auto">
           <div className="text-center mb-6 shrink-0 mt-4">
-            <div className="inline-flex items-center justify-center w-[28rem] h-28 bg-white rounded-[2rem] shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] mb-8 ring-4 ring-[#C5A065] ring-offset-4 ring-offset-[#0F3D3E]">
-              <img src="/logo.png" alt="Logo" className="w-[26rem] h-20 object-contain" />
+            {/* Logo Container: Responsive width for mobile */}
+            <div className="inline-flex items-center justify-center w-full max-w-[85%] md:w-[28rem] h-24 md:h-28 bg-white rounded-[2rem] shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] mb-8 ring-4 ring-[#C5A065] ring-offset-4 ring-offset-[#0F3D3E] p-4 mx-auto">
+              <img src="/logo.png" alt="Logo" className="w-full h-full object-contain" />
             </div>
             <h1 className="text-3xl md:text-5xl font-serif font-black text-white tracking-tight mb-3 drop-shadow-lg">Vendor Portal</h1>
             <p className="text-[#C5A065] font-bold uppercase tracking-[0.3em] text-[10px] text-shadow-sm flex items-center justify-center gap-4">
