@@ -13,10 +13,10 @@ export const APPROVAL_WORKFLOW_ROLES = {
         email: "ahmed.abdelaziz@drsulaimanalhabib.com",
         job_title: "Assistant Purchasing Director"
     },
-    planning_director: {
-        name: "Planning Director Name",
+    planning_executive_director: {
+        name: "Ahmed Al Sharif",
         email: "ahmed.m.alsharif@drsulaimanalhabib.com",
-        job_title: "Planning Director"
+        job_title: "Planning Executive Director"
     },
     commercial_executive_director: {
         name: "Executive Director Name",

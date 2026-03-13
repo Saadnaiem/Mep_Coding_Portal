@@ -37,11 +37,22 @@ export const ROLE_LABELS: Record<EmployeeRole, string> = {
   category_manager: 'Category Manager',
   purchasing_manager: 'Purchasing Manager',
   assistant_purchasing_director: 'Assistant Purchasing Director',
-  planning_director: 'Planning Director',
+  planning_executive_director: 'Planning Executive Director',
   commercial_business_development_executive_director: 'Commercial and Business Development Executive Director',
   exec_director: 'Executive Director',
   general_director: 'General Director',
   planning_erp_creation: 'Planning - ERP Creation',
   super_admin: 'Super Admin',
   e_commerce_admin: 'E-commerce Admin',
+  admin: 'Admin',
+};
+
+export const BRAND_AR_MAP: Record<string, string> = {
+  'Listerine': 'ليسترين',
+  'LISTERINE': 'ليسترين', 
+  'Johnson & Johnson': 'جونسون آند جونسون',
+  'Pampers': 'بامبرز',
+  'Huggies': 'هجيز',
+  'Nivea': 'نيفيا',
+  'Dove': 'دوف',
 };

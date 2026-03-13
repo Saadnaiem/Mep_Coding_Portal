@@ -16,7 +16,7 @@ create table public.profiles (
   id uuid references auth.users on delete cascade not null primary key,
   email text,
   full_name text,
-  role text default 'vendor' not null check (role in ('category_manager', 'purchasing_manager', 'assistant_purchasing_director', 'planning_director', 'commercial_executive_director', 'general_manager', 'exec_director', 'general_director', 'erp_team', 'super_admin', 'vendor')),
+  role text default 'vendor' not null check (role in ('category_manager', 'purchasing_manager', 'assistant_purchasing_director', 'planning_executive_director', 'commercial_executive_director', 'general_manager', 'exec_director', 'general_director', 'erp_team', 'super_admin', 'vendor')),
   department text,
   job_title text,
   active boolean default true,
@@ -167,7 +167,7 @@ insert into public.workflow_steps (step_number, step_name, role_required, sla_ho
   (1, 'Category Manager Approval', 'category_manager', 24),
   (2, 'Purchasing Manager Approval', 'purchasing_manager', 24),
   (3, 'Assistant Purchasing Director Approval', 'assistant_purchasing_director', 48),
-  (4, 'Planning Director Approval', 'planning_director', 24),
+  (4, 'Planning Executive Director Approval', 'planning_executive_director', 24),
   (5, 'Commercial and BD Exec Director', 'commercial_executive_director', 48),
   (6, 'General Director Approval', 'general_manager', 48),
   (7, 'ERP Code Issuance', 'erp_team', 24);

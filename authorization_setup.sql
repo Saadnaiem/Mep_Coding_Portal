@@ -13,7 +13,7 @@ insert into public.workflow_steps (step_number, step_name, role_required, sla_ho
   (1, 'Category Manager Approval', 'category_manager', 24),
   (2, 'Purchasing Manager Approval', 'purchasing_manager', 24),
   (3, 'Assistant Purchasing Director Approval', 'assistant_purchasing_director', 48),
-  (4, 'Planning Director Approval', 'planning_director', 24),
+  (4, 'Planning Executive Director Approval', 'planning_executive_director', 24),
   (5, 'Commercial and BD Exec Director', 'commercial_executive_director', 48),
   (6, 'General Director Approval', 'general_manager', 48),
   (7, 'ERP Code Issuance', 'erp_team', 24);
@@ -29,8 +29,8 @@ INSERT INTO public.profiles (id, email, full_name, role, job_title, department) 
   -- Step 3: Assistant Purchasing Director
   ('e-apd-01', 'asst.director@drsulaimanalhabib.com', 'Layla Director', 'assistant_purchasing_director', 'Assistant Purchasing Director', 'Purchasing'),
   
-  -- Step 4: Planning Director
-  ('e-pd-01', 'planning.director@drsulaimanalhabib.com', 'Omar Planner', 'planning_director', 'Planning Director', 'Planning'),
+  -- Step 4: Planning Executive Director
+  ('e-pd-01', 'ahmed.m.alsharif@drsulaimanalhabib.com', 'Ahmed Al Sharif', 'planning_executive_director', 'Planning Executive Director', 'Planning'),
   
   -- Step 5: Commercial & BD Executive Director
   ('e-cbd-01', 'commercial.exec@drsulaimanalhabib.com', 'Khalid Executive', 'commercial_executive_director', 'Executive Director', 'Commercial'),

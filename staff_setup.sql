@@ -30,14 +30,14 @@ SET
   job_title = 'Assistant Purchasing Director'
 WHERE email = 'asst.director@drsulaimanalhabib.com';
 
--- Example: Set up Planning Director
+-- Example: Set up Planning Executive Director
 UPDATE public.profiles 
 SET 
-  role = 'planning_director', 
-  full_name = 'Omar Planner',
+  role = 'planning_executive_director', 
+  full_name = 'Ahmed Al Sharif',
   department = 'Planning',
-  job_title = 'Planning Director'
-WHERE email = 'planning.director@drsulaimanalhabib.com';
+  job_title = 'Planning Executive Director'
+WHERE email = 'ahmed.m.alsharif@drsulaimanalhabib.com';
 
 -- Example: Set up Commercial Executive Director
 UPDATE public.profiles 

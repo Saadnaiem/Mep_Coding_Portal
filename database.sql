@@ -5,7 +5,7 @@ create table public.profiles (
   id uuid references auth.users not null primary key, -- specific to Supabase Auth
   email text unique not null,
   full_name text,
-  role text check (role in ('category_manager', 'purchasing_manager', 'assistant_purchasing_director', 'planning_director', 'commercial_business_development_executive_director', 'exec_director', 'general_director', 'planning_erp_creation', 'super_admin', 'vendor')),
+  role text check (role in ('category_manager', 'purchasing_manager', 'assistant_purchasing_director', 'planning_executive_director', 'commercial_business_development_executive_director', 'exec_director', 'general_director', 'planning_erp_creation', 'super_admin', 'vendor')),
   department text, -- For employees
   job_title text,
   active boolean default true,

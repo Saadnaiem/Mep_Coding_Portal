@@ -59,8 +59,8 @@ import { NewVendorForm } from './components/NewVendorForm';
 import { StaffManagement } from './components/StaffManagement';
 import { Reports } from './components/Reports';
 import { EcommerceExport } from './components/EcommerceExport';
-import { RequestStatus, ProductRequest, UserType, EmployeeRole, Product, StepAction, HierarchyNode, Vendor } from './types';
-import { ROLE_LABELS, STATUS_MAP } from './constants';
+import { RequestStatus, ProductRequest, UserType, EmployeeRole, Product, StepAction, HierarchyNode, Vendor, ActionType } from './types';
+import { ROLE_LABELS, STATUS_MAP, BRAND_AR_MAP } from './constants';
 
 const EditableField = ({ label, value, onChange, type = 'text', options }: any) => {
     const [localValue, setLocalValue] = useState(value);
@@ -239,13 +239,13 @@ const App: React.FC = () => {
   // App State
   const [view, setView] = useState<'dashboard' | 'request_details' | 'new_request' | 'employee_inbox' | 'admin_staff' | 'preferences' | 'audit_log' | 'reports' | 'vendor_profile' | 'ecommerce_export'>('dashboard');
   const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(() => window.innerWidth > 1024);
-  
-  // Update sidebar on resize
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Default collapsed as requested
+
+  // Update sidebar on resize - Removed logic to auto-open, only auto-close on mobile
   useEffect(() => {
     const handleResize = () => {
        if (window.innerWidth < 1024) setIsSidebarOpen(false);
-       else setIsSidebarOpen(true);
+       // Removed auto-open logic
     };
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
@@ -1190,6 +1190,143 @@ Al Habib Pharmacy Team`;
     }
   };
 
+
+
+  const generateRequestCSV = async () => {
+    if (!currentRequest) return;
+    try {
+        // Fetch fresh data for the CSV to ensure it matches the detailed requirements
+        let requestProducts = products.filter(p => p.request_id === currentRequest.id);
+        
+        // Try fetch fresh
+        try {
+            const freshProducts = await db.fetchProducts(currentRequest.id);
+            if (freshProducts && freshProducts.length > 0) {
+                 requestProducts = freshProducts;
+            }
+        } catch (e) {
+            console.warn("Could not fetch fresh products for CSV, using local state");
+        }
+
+        const rows = requestProducts.map((p, index) => ({
+            // MEP Coding Form Structure - REORDERED 2026-03-14 (User Request)
+            
+            // 1. Vendor & Site Info (Priority)
+            "Vendor Number": p.vendor_no || '',
+            // Fallback chain: Request Vendor -> Current Login Vendor -> Product Vendor Name -> N/A
+            "Vendor Name": currentRequest.vendor?.company_name || currentVendor?.company_name || p.vendor_name || 'N/A',
+            "Site Name": p.site_name || '',
+            "Site Number": p.site_no || '',
+
+            // 2. Product Identification 
+            "Brand (EN)": p.brand || '',
+            "Barcode": p.barcode,
+            "Item Description (EN)": (p.item_description || p.product_name || '').replace(/(\r\n|\n|\r)/gm, " "),
+            "Item Description (AR)": (p.product_name_ar || '').replace(/(\r\n|\n|\r)/gm, " "),
+
+            // 3. Hierarchy
+            "Division": p.division || 'N/A',
+            "Department": p.department || 'N/A',
+            "Category": p.category || 'N/A',
+            "Sub Category": p.sub_category || 'N/A',
+            "Class": p.class_name || 'N/A',
+
+            // 4. Pricing & Commercials
+            "Cost Price": (p.price_cost || 0).toFixed(2),
+            "Retail Price": (p.price_retail || 0).toFixed(2),
+            "Margin %": (p.price_retail && p.price_cost && Number(p.price_retail) > 0) 
+                         ? ((1 - (Number(p.price_cost) / Number(p.price_retail))) * 100).toFixed(2) + '%' 
+                         : '0.00%',
+            "Taxable (Vat)": p.taxable ? 'Yes' : 'No',
+
+            // 5. Remaining Useful Columns
+            "Vendor System Code": p.vendor_system_code || '',
+            "Brand (AR)": p.brand_ar || (BRAND_AR_MAP ? (BRAND_AR_MAP[p.brand] || BRAND_AR_MAP[p.brand.toLowerCase()]) : '') || '',
+            "Manufacturer": p.manufacturer || '',
+            "Country of Origin": p.country_of_origin,
+            
+            "Buyer": p.buyer || '',
+            "Category Manager": p.category_manager || '',
+            
+            "Item Group": p.item_group || '',
+            "Item Sub Group": p.item_sub_group || '',
+            "ERP Item Code": p.erp_item_code || '', 
+
+            "Based UOM": p.uom || 'Each',
+            "Pack Size": p.pack_size || '',
+            "Inner Pack Size": p.inner_pack_size || '',
+            "Case Count": p.case_count || '',
+            "Barcode Type": p.barcode_type_primary || 'EAN-13',
+            
+            "Min Order Qty": p.min_order_qty || 0,
+            "Lead Time": p.lead_time || '',
+            "Primary Warehouse": p.primary_warehouse || '',
+            "RTV Allowed": p.rtv_allowed ? 'Yes' : 'No',
+            "Lot Indicator": p.lot_indicator ? 'Yes' : 'No',
+            "Shelf Life": p.shelf_life || '',
+            "Storage Condition": p.storage_condition || '',
+
+            "Currency": p.currency || 'SAR',
+            "MOH Discount %": (p.moh_discount_percentage || 0) + '%',
+            "Invoice Extra Discount %": (p.invoice_extra_discount || 0) + '%',
+            "Payment Terms": currentVendor?.payment_terms || '60 Days',
+            "Bonus": p.bonus || '',
+            "New Vendor Reg Fees": currentVendor?.new_vendor_registration_fees || '',
+            "Product Listing Fees": p.product_listing_fees || '',
+            
+            "Status": p.purchasing_status || 'Active',
+            "Request No": currentRequest.request_number,
+            "Submission Date": new Date(currentRequest.created_at).toLocaleDateString()
+        }));
+
+        if (rows.length === 0) {
+            alert("No products to export.");
+            return;
+        }
+
+        // Generate CSV Content with BOM for Excel UTF-8 support
+        const headers = Object.keys(rows[0]);
+        const csvContent = '\uFEFF' + [
+            headers.join(','), // Header Row
+            ...rows.map(row => headers.map(header => {
+                const value = (row as any)[header] || '';
+                
+                // If it is 'Barcode' and looks like a valid number, attempt to export as raw number 
+                // to prevent Excel from treating it as text (if desired).
+                // However, EAN13 barcodes are often 13 digits, which Excel might display in scientific notation (1.23E+12).
+                // To force it as text, we quote it. To force it as number, we unquote it.
+                // The user specifically asked "make barcode to be number", so we will NOT quote it if it is numeric.
+                if (header === 'Barcode' && !isNaN(Number(value)) && String(value).trim() !== '') {
+                     // CAUTION: Excel might show 1.23E+12 for long barcodes. 
+                     // But this is what "make it a number" technically means.
+                     return String(value);
+                }
+
+                // Default: Escape quotes and wrap in quotes to handle commas/newlines in data
+                const escaped = String(value).replace(/"/g, '""');
+                return `"${escaped}"`;
+            }).join(','))
+        ].join('\n');
+
+        // Create Blob and Trigger Download
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        if (link.download !== undefined) {
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            // Use a name that indicates it's for Coding Form
+            link.setAttribute('download', `MEP_Coding_Form_Data_${currentRequest.request_number}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    } catch (err) {
+        console.error("CSV Export Error", err);
+        alert("Failed to export CSV.");
+    }
+  };
+
   const generateRequestPDF = async () => {
     try {
     console.log("Starting PDF generation...");
@@ -1327,7 +1464,56 @@ Al Habib Pharmacy Team`;
       }
     });
 
-    // --- PAGE 2: APPROVAL SEQUENCE & HISTORY ---
+    // --- PAGE 2: PRODUCT LISTING SUMMARY ---
+    doc.addPage();
+    
+    // Modern Header Bar
+    doc.setFillColor(15, 61, 62); // Teal
+    doc.rect(0, 15, pageWidth, 14, 'F');
+    
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(14);
+    doc.setTextColor(255, 255, 255); // White
+    doc.text("PRODUCT LISTING SUMMARY", 15, 24);
+    
+    // Gold Accent Line under header
+    doc.setDrawColor(197, 160, 101); 
+    doc.setLineWidth(0.8);
+    doc.line(0, 29, pageWidth, 29);
+
+    const productSummaryBody = requestProducts.map(p => {
+        const margin = (p.price_cost && p.price_retail && Number(p.price_retail) > 0) 
+            ? ((1 - (Number(p.price_cost) / Number(p.price_retail))) * 100).toFixed(2) + '%' 
+            : '-';
+        return [
+            p.brand || '-',
+            p.product_name || '-',
+            `${p.currency || ''} ${Number(p.price_cost || 0).toFixed(2)}`,
+            `${p.currency || ''} ${Number(p.price_retail || 0).toFixed(2)}`,
+            margin,
+            p.taxable ? 'Yes' : 'No'
+        ];
+    });
+
+    autoTable(doc, {
+        startY: 40,
+        head: [['Brand', 'Product Name', 'Cost Price', 'Selling Price', 'Margin', 'Taxable']],
+        body: productSummaryBody,
+        theme: 'grid',
+        headStyles: { fillColor: [15, 61, 62], textColor: 255, fontStyle: 'bold' },
+        bodyStyles: { textColor: [15, 61, 62] },
+        styles: { fontSize: 9, cellPadding: 3, valign: 'middle' },
+        columnStyles: {
+            0: { fontStyle: 'bold', cellWidth: 35 },
+            1: { cellWidth: 'auto' },
+            2: { halign: 'right', cellWidth: 30, fontStyle: 'bold', textColor: [225, 29, 72] }, // Rose Red for Cost
+            3: { halign: 'right', cellWidth: 30, fontStyle: 'bold', textColor: [5, 150, 105] }, // Emerald Green for Selling
+            4: { halign: 'center', cellWidth: 20, fontStyle: 'bold', textColor: [37, 99, 235] }, // Blue for Margin
+            5: { halign: 'center', cellWidth: 20 }
+        }
+    });
+
+    // --- PAGE 3: APPROVAL SEQUENCE & HISTORY ---
     doc.addPage();
     
     // Modern Header Bar
@@ -2227,6 +2413,7 @@ Al Habib Pharmacy Team`;
     const isEditable = isCorrection || (isRequestActionable && currentRequest?.current_step === 7) || (isRequestActionable && (currentRequest?.current_step === 1 || currentUserEmployee?.role === 'super_admin'));
     
     const [assignedManagerName, setAssignedManagerName] = useState<string | null>(null);
+    const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
     const [editableVendor, setEditableVendor] = useState<Partial<any>>({});
     const [isVendorModalOpen, setIsVendorModalOpen] = useState(false);
     const [uploadingState, setUploadingState] = useState<Record<string, boolean>>({});
@@ -2490,7 +2677,7 @@ Al Habib Pharmacy Team`;
       )}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-gray-100 pb-8 gap-6 md:gap-0 sticky top-20 md:top-60 z-30 bg-[#fcfdfc] pt-4 -mt-4 transition-all">
         <div className="flex items-center gap-4 md:gap-6 w-full">
-          <button onClick={() => setView('dashboard')} className="p-3 bg-white border-2 border-[#C5A065]/20 rounded-xl text-[#C5A065] hover:text-[#0F3D3E] hover:border-[#0F3D3E] hover:scale-105 transition-all"><ArrowLeft size={24} strokeWidth={3} /></button>
+          <button onClick={() => setView('dashboard')} className="p-3 bg-[#0F3D3E] border-2 border-[#0F3D3E] rounded-xl text-white hover:bg-[#0F3D3E]/90 hover:scale-105 transition-all shadow-md"><ArrowLeft size={24} strokeWidth={3} /></button>
           <div className="flex-1">
             <h2 className="text-2xl md:text-4xl font-serif font-black text-[#0F3D3E] tracking-tight mb-2 break-all">{currentRequest?.request_number}</h2>
             <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
@@ -2513,6 +2700,10 @@ Al Habib Pharmacy Team`;
                    <span className="font-bold tracking-wide">Submit Corrections</span>
                 </Button>
             )}
+            <Button onClick={generateRequestCSV} className="bg-emerald-600 text-white hover:bg-emerald-700 h-12 px-6 rounded-xl shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-2 transition-transform hover:scale-105 w-full sm:w-auto">
+               <FileText size={20} />
+               <span className="font-bold tracking-wide">Export CSV</span>
+            </Button>
             <Button onClick={generateRequestPDF} className="bg-[#0F3D3E] text-white hover:bg-[#0F3D3E]/90 h-12 px-6 rounded-xl shadow-lg shadow-[#0F3D3E]/20 flex items-center justify-center gap-2 transition-transform hover:scale-105 w-full sm:w-auto">
                <Download size={20} />
                <span className="font-bold tracking-wide">Export PDF</span>
@@ -2521,12 +2712,82 @@ Al Habib Pharmacy Team`;
       </div>
       <Card title="Onboarding Progress" noPadding className="border-t-4 border-t-[#C5A065]">
         <div className="p-4 md:p-12 overflow-x-auto"><Stepper currentStep={currentRequest?.current_step || 1} totalSteps={MOCK_STEPS.length} labels={MOCK_STEPS.map(s => s.step_name)} /></div>
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-10 p-6 md:p-10 bg-[#f8f9fa] border-t border-gray-100">
-          <div className="space-y-6 lg:col-span-3">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 p-6 md:p-10 bg-[#f8f9fa] border-t border-gray-100">
+          <div className="space-y-6 lg:col-span-9">
 
             <Card title="Product Listing Details" className="bg-white shadow-sm border border-gray-100">
                <div className="space-y-6">
-                 {(isEditable && editableProducts.length > 0 ? editableProducts : products).map(p => (
+                 {!selectedProductId ? (
+                    <div className="overflow-x-auto rounded-xl border border-gray-100">
+                        <table className="w-full text-left text-sm">
+                            <thead>
+                                <tr className="bg-[#0F3D3E] border-b border-gray-100 text-[10px] text-white uppercase tracking-widest font-black font-serif">
+                                    <th className="p-4 pl-6">Brand</th>
+                                    <th className="p-4">Product Name</th>
+                                    <th className="p-4 text-right">Cost Price</th>
+                                    <th className="p-4 text-right">Selling Price</th>
+                                    <th className="p-4 text-center">Margin</th>
+                                    <th className="p-4 text-center">Taxable</th>
+                                    <th className="p-4 text-right pr-6">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-50">
+                                {(isEditable && editableProducts.length > 0 ? editableProducts : products).map(p => {
+                                    // Generate persistent random color for brand using predefined palette for better readability
+                                    const brandColor = (() => {
+                                        const PALETTE = [
+                                          '#b91c1c', '#c2410c', '#b45309', '#4d7c0f', '#15803d', '#0f766e', '#0369a1', '#1d4ed8', '#4338ca', 
+                                          '#6d28d9', '#a21caf', '#be185d', '#be123c', '#e11d48', '#0891b2', '#059669', '#d97706', '#ea580c'
+                                        ];
+                                        let hash = 0;
+                                        const str = p.brand || '';
+                                        for (let i = 0; i < str.length; i++) {
+                                            hash = str.charCodeAt(i) + ((hash << 5) - hash);
+                                        }
+                                        return PALETTE[Math.abs(hash) % PALETTE.length];
+                                    })();
+
+                                    return (
+                                    <tr key={p.id} className="hover:bg-gray-50 transition-colors group cursor-pointer" onClick={() => setSelectedProductId(p.id)}>
+                                        <td className="p-4 pl-6 font-black text-base tracking-wide" style={{ color: brandColor }}>{p.brand}</td>
+                                        <td className="p-4 text-[#0F3D3E] font-medium">{p.product_name}</td>
+                                        <td className="p-4 text-right font-mono font-bold text-rose-600">{p.currency} {Number(p.price_cost).toFixed(2)}</td>
+                                        <td className="p-4 text-right font-mono font-bold text-emerald-600">{p.currency} {Number(p.price_retail).toFixed(2)}</td>
+                                        <td className="p-4 text-center font-bold text-blue-600">
+                                            {(p.price_cost && p.price_retail && Number(p.price_retail) > 0) 
+                                                ? ((1 - (Number(p.price_cost) / Number(p.price_retail))) * 100).toFixed(2) + '%' 
+                                                : '-'}
+                                        </td>
+                                        <td className="p-4 text-center">
+                                            <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${p.taxable ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                                                {p.taxable ? 'Yes' : 'No'}
+                                            </span>
+                                        </td>
+                                        <td className="p-4 text-right pr-6">
+                                            <Button size="sm" className="bg-[#0F3D3E] text-white hover:bg-[#0F3D3E]/90 shadow-sm transition-all hover:scale-105" onClick={(e: any) => { e.stopPropagation(); setSelectedProductId(p.id); }}>
+                                                View <ChevronRight size={14} className="ml-1" />
+                                            </Button>
+                                        </td>
+                                    </tr>
+                                )})}
+                                {(isEditable && editableProducts.length > 0 ? editableProducts : products).length === 0 && (
+                                    <tr>
+                                        <td colSpan={7} className="p-8 text-center text-gray-400 font-serif italic">No products available.</td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                 ) : (
+                    <>
+                    <div className="flex items-center justify-between mb-4">
+                        <Button className="h-10 px-4 rounded-xl text-sm font-bold bg-[#0F3D3E] !bg-none text-white hover:bg-[#0F3D3E]/90 hover:text-white border-none shadow-md" onClick={() => setSelectedProductId(null)}>
+                            <ArrowLeft size={16} className="mr-2" strokeWidth={3} /> Back to List
+                        </Button>
+                    </div>
+                    {(isEditable && editableProducts.length > 0 ? editableProducts : products)
+                        .filter(p => p.id === selectedProductId)
+                        .map(p => (
                    <div key={p.id} className={`p-8 bg-white rounded-2xl border shadow-sm transition-all ${isEditable ? 'border-amber-400 ring-4 ring-amber-50' : 'border-gray-100 hover:border-[#C5A065]/30'}`}>
                       {/* Header Section */}
                       <div className="flex justify-between items-start mb-8 border-b border-gray-50 pb-6">
@@ -2754,6 +3015,8 @@ Al Habib Pharmacy Team`;
                       </div>
                    </div>
                  ))}
+                 </>
+                 )}
                </div>
             </Card>
 
@@ -2848,7 +3111,7 @@ Al Habib Pharmacy Team`;
                 </>
            )}
           </div>
-          <div className="space-y-8 lg:col-span-2">
+          <div className="space-y-8 lg:col-span-3">
              {/* Decision History is visible to everyone within the context of a Request */}
              <Card title="Audit Log & Decision History" className="bg-white shadow-sm border border-gray-100">
                <div className="space-y-8 pl-2">

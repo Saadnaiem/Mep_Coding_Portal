@@ -7,13 +7,14 @@ export type EmployeeRole =
   | 'category_manager' 
   | 'purchasing_manager' 
   | 'assistant_purchasing_director' 
-  | 'planning_director' 
+  | 'planning_executive_director' 
   | 'commercial_business_development_executive_director' 
   | 'exec_director' 
   | 'general_director' 
   | 'planning_erp_creation' 
   | 'super_admin'
-  | 'e_commerce_admin';
+  | 'e_commerce_admin'
+  | 'admin';
 export type ActionType = 'submit' | 'approve' | 'reject' | 'return' | 'comment' | 'upload';
 
 export interface Profile {
