@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { ProductRequest, Product, StepAction, Profile, Employee } from '../types';
+import { ProductRequest, Product, StepAction, Profile, Employee, ExistingProductModification } from '../types';
 
 class DatabaseService {
   
@@ -201,6 +201,7 @@ class DatabaseService {
     const { data, error } = await supabase
       .from('profiles')
       .select('*')
+      .neq('role', 'vendor')
       .order('full_name', { ascending: true });
 
     if (error) {
@@ -327,13 +328,43 @@ class DatabaseService {
   }
   
   async fetchEmployeesByRole(role: string): Promise<Profile[]> {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('role', role);
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('role', role);
+    
+    if (error) {
+        console.error('Error fetching employees by role:', error);
+        return [];
+    }
+    return data || [];
+  }
+
+  // --- Existing Product Modifications ---
+  async createExistingModification(mod: Partial<ExistingProductModification>): Promise<boolean> {
+      const { error } = await supabase
+          .from('existing_product_modifications')
+          .insert(mod);
       
       if (error) {
-          console.error('Error fetching employees by role:', error);
+          console.error('Error creating existing product modification:', error);
+          alert('Failed to submit: ' + error.message);
+          return false;
+      }
+      return true;
+  }
+
+  async fetchExistingModifications(): Promise<ExistingProductModification[]> {
+      const { data, error } = await supabase
+          .from('existing_product_modifications')
+          .select(`
+             *,
+             vendor:vendors(company_name, contact_person_name, email_address, mobile_number, phone_number)
+          `)
+          .order('created_at', { ascending: false });
+      
+      if (error) {
+          console.error('Error fetching existing modifications:', error);
           return [];
       }
       return data || [];

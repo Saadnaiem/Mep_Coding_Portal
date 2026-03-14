@@ -59,6 +59,8 @@ import { NewVendorForm } from './components/NewVendorForm';
 import { StaffManagement } from './components/StaffManagement';
 import { Reports } from './components/Reports';
 import { EcommerceExport } from './components/EcommerceExport';
+import { ExistingProductModification } from './components/ExistingProductModification';
+import { ExistingModificationsReport } from './components/ExistingModificationsReport';
 import { RequestStatus, ProductRequest, UserType, EmployeeRole, Product, StepAction, HierarchyNode, Vendor, ActionType } from './types';
 import { ROLE_LABELS, STATUS_MAP, BRAND_AR_MAP } from './constants';
 
@@ -237,7 +239,7 @@ const App: React.FC = () => {
   const [showEmailConfirmation, setShowEmailConfirmation] = useState(false);
 
   // App State
-  const [view, setView] = useState<'dashboard' | 'request_details' | 'new_request' | 'employee_inbox' | 'admin_staff' | 'preferences' | 'audit_log' | 'reports' | 'vendor_profile' | 'ecommerce_export'>('dashboard');
+  const [view, setView] = useState<'dashboard' | 'request_details' | 'new_request' | 'employee_inbox' | 'admin_staff' | 'preferences' | 'audit_log' | 'reports' | 'vendor_profile' | 'ecommerce_export' | 'catalogue_modification' | 'existing_product_modification' | 'existing_modifications_report'>('dashboard');
   const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Default collapsed as requested
 
@@ -2169,7 +2171,12 @@ Al Habib Pharmacy Team`;
           <h2 className="text-3xl md:text-4xl font-serif font-black text-[#0F3D3E] tracking-tight mb-2">{title}</h2>
           <p className="text-[#C5A065] text-sm font-bold tracking-wide">{subtitle}</p>
         </div>
-        {activePortal === 'vendor' && <Button onClick={() => setView('new_request')} className="w-full md:w-auto px-8 h-12 shadow-lg shadow-[#0F3D3E]/20 hover:scale-105"><Plus size={20} />New Request</Button>}
+        {activePortal === 'vendor' && (
+            <div className="flex flex-col md:flex-row gap-2">
+                <Button onClick={() => setView('new_request')} className="w-full md:w-auto px-6 h-10 shadow-lg shadow-[#0F3D3E]/20 hover:scale-105 bg-[#0F3D3E] text-white text-xs"><Plus size={16} />New Request</Button>
+                <Button onClick={() => setView('existing_product_modification')} className="w-full md:w-auto px-6 h-10 shadow-lg hover:scale-105 bg-[#C5A065] text-white border border-[#C5A065] text-xs"><LayoutDashboard size={16} />Existing Products Mod</Button>
+            </div>
+        )}
       </div>
 
       {/* Filter Bar */}
@@ -3259,7 +3266,7 @@ Al Habib Pharmacy Team`;
                     {authMode === 'login' ? 'Access Vendor Portal' : 'Create Account'} <ArrowRight size={18} strokeWidth={3} />
                 </Button>
                 <div className="pt-4 border-t border-gray-100 text-center">
-                    <button type="button" onClick={() => navigate('/staff')} className="px-6 py-3 rounded-xl bg-[#C5A065] text-white text-[10px] font-bold uppercase tracking-wider hover:bg-[#b08d55] transition-colors shadow-lg">Access Staff Portal Instead</button>
+                    <button type="button" onClick={() => navigate('/staff')} className="w-full px-6 py-4 rounded-xl bg-[#C5A065] text-white text-sm font-bold uppercase tracking-wider hover:bg-[#b08d55] transition-colors shadow-lg">Access Staff Portal Instead</button>
                 </div>
                 </form>
                 </>
@@ -3317,7 +3324,7 @@ Al Habib Pharmacy Team`;
                     <button type="button" onClick={() => { 
                         navigate('/'); 
                         setAuthMode('login'); // Reset to login when switching back to vendor default
-                    }} className="px-6 py-3 rounded-xl bg-[#C5A065] text-white text-[10px] font-bold uppercase tracking-wider hover:bg-[#b08d55] transition-colors shadow-lg">Switch to Vendor Portal</button>
+                    }} className="w-full px-6 py-4 rounded-xl bg-[#C5A065] text-white text-sm font-bold uppercase tracking-wider hover:bg-[#b08d55] transition-colors shadow-lg">Switch to Vendor Portal</button>
                  </div>
             </form>
           </Card>
@@ -3437,6 +3444,7 @@ Al Habib Pharmacy Team`;
                 <>
                     <p className={`px-4 text-[10px] font-black text-gray-300 uppercase tracking-widest ${!isSidebarOpen ? 'md:hidden' : ''}`}>E-Commerce</p>
                     <SidebarItem icon={Download} label="Products Export" active={view === 'ecommerce_export'} onClick={() => { setView('ecommerce_export'); if(window.innerWidth < 768) setIsSidebarOpen(false); }} collapsed={!isSidebarOpen} />
+                    <SidebarItem icon={FileText} label="Modifications Report" active={view === 'existing_modifications_report'} onClick={() => { setView('existing_modifications_report'); if(window.innerWidth < 768) setIsSidebarOpen(false); }} collapsed={!isSidebarOpen} />
                     <SidebarItem icon={Settings} label="Preferences" active={view === 'preferences'} onClick={() => { setView('preferences'); if(window.innerWidth < 768) setIsSidebarOpen(false); }} collapsed={!isSidebarOpen} />
                 </>
             ) : (
@@ -3451,6 +3459,9 @@ Al Habib Pharmacy Team`;
                         <SidebarItem icon={FileText} label="Master Reports" active={view === 'reports'} onClick={() => { setView('reports'); if(window.innerWidth < 768) setIsSidebarOpen(false); }} collapsed={!isSidebarOpen} />
                         <SidebarItem icon={Download} label="Products Export" active={view === 'ecommerce_export'} onClick={() => { setView('ecommerce_export'); if(window.innerWidth < 768) setIsSidebarOpen(false); }} collapsed={!isSidebarOpen} />
                     </>
+                    )}
+                    {activePortal === 'employee' && (currentUserEmployee?.role === 'super_admin' || currentUserEmployee?.role === 'e_commerce_admin') && (
+                        <SidebarItem icon={FileText} label="Modifications Report" active={view === 'existing_modifications_report'} onClick={() => { setView('existing_modifications_report'); if(window.innerWidth < 768) setIsSidebarOpen(false); }} collapsed={!isSidebarOpen} />
                     )}
                     {activePortal === 'vendor' && <SidebarItem icon={ClipboardList} label="Audit Log" active={view === 'audit_log'} onClick={() => { setView('audit_log'); if(window.innerWidth < 768) setIsSidebarOpen(false); }} collapsed={!isSidebarOpen} />}
                     <SidebarItem icon={Settings} label="Preferences" active={view === 'preferences'} onClick={() => { setView('preferences'); if(window.innerWidth < 768) setIsSidebarOpen(false); }} collapsed={!isSidebarOpen} />
@@ -3469,6 +3480,8 @@ Al Habib Pharmacy Team`;
           {view === 'audit_log' && AuditLog()}
           {view === 'preferences' && Preferences()}
           {view === 'ecommerce_export' && <EcommerceExport />}
+          {view === 'existing_product_modification' && <ExistingProductModification user={currentUserProfile} vendorId={currentVendor?.id} onCancel={() => setView('dashboard')} onSuccess={() => setView('dashboard')} />}
+          {view === 'existing_modifications_report' && <ExistingModificationsReport />}
         </main>
       </div>
       <Modal isOpen={isActionModalOpen} onClose={() => setIsActionModalOpen(false)} title="Audit Review Decision">

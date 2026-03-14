@@ -191,6 +191,43 @@ export interface Product {
   images?: string[];
 }
 
+export interface ExistingProductModification {
+    id: string;
+    created_at: string;
+    vendor_id: string;
+    sku_gtin: string;
+    product_name_en: string;
+    product_name_ar: string;
+    brand_en: string;
+    brand_ar: string;
+    short_description_en?: string;
+    short_description_ar?: string;
+    storage_en?: string;
+    storage_ar?: string;
+    composition_en?: string;
+    composition_ar?: string;
+    indication_en?: string;
+    indication_ar?: string;
+    how_to_use_en?: string;
+    how_to_use_ar?: string;
+    side_effects_en?: string;
+    side_effects_ar?: string;
+    category?: string;
+    group?: string;
+    subgroup?: string;
+    tags_filters?: string;
+    suggested_filters?: string;
+    division?: string;
+    department?: string;
+    category_pop?: string;
+    sub_category_pop?: string;
+    class_name?: string;
+    image_urls?: string[];
+    status?: string;
+    // Joined
+    vendor?: Vendor;
+}
+
 export interface StepAction {
   id: string;
   request_id: string;
