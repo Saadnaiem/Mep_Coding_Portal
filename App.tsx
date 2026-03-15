@@ -1552,15 +1552,15 @@ Al Habib Pharmacy Team`;
         },
         bodyStyles: { textColor: [15, 61, 62] },
         styles: { 
-            fontSize: 10, // Increased font size for readability
-            cellPadding: 4, 
+            fontSize: 10, 
+            cellPadding: 1.5, // Reduced padding from 4 to 1.5 to decrease row height
             valign: 'middle',
             // Use Amiri to safely render mixed content without symbols
             font: isArabicFontLoaded ? "Amiri" : "helvetica",
             fontStyle: "normal"
         },
         columnStyles: {
-            0: { fontStyle: 'bold', cellWidth: 35 }, // Brand
+            0: { fontStyle: 'bold', cellWidth: 38 }, // Brand - Reduced slightly to save space
             1: { cellWidth: 'auto', fontStyle: 'bold' }, // Product Name
             2: { halign: 'right', cellWidth: 30, fontStyle: 'bold', textColor: [225, 29, 72] }, // Cost Price
             3: { halign: 'right', cellWidth: 32, fontStyle: 'bold', textColor: [5, 150, 105] }, // Selling Price
@@ -2850,7 +2850,15 @@ Al Habib Pharmacy Team`;
         </div>
       </div>
       <Card title="Onboarding Progress" noPadding className="border-t-4 border-t-[#C5A065]">
-        <div className="p-4 md:p-12 overflow-x-auto"><Stepper currentStep={currentRequest?.current_step || 1} totalSteps={MOCK_STEPS.length} labels={MOCK_STEPS.map(s => s.step_name)} /></div>
+        <div className="p-4 md:p-12 overflow-x-auto">
+            <Stepper 
+                currentStep={(currentRequest?.status === 'completed' || currentRequest?.status === 'approved') 
+                    ? (MOCK_STEPS.length + 1) 
+                    : (currentRequest?.current_step || 1)} 
+                totalSteps={MOCK_STEPS.length} 
+                labels={MOCK_STEPS.map(s => s.step_name)} 
+            />
+        </div>
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 p-6 md:p-10 bg-[#f8f9fa] border-t border-gray-100">
           <div className="space-y-6 lg:col-span-9">
 
