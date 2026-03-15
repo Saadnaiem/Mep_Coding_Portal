@@ -1525,7 +1525,7 @@ Al Habib Pharmacy Team`;
             : '-';
         
         // Filter out Arabic characters from the name to ensure English display
-        let pName = p.short_description_en || p.item_description || p.product_name || '-';
+        let pName = p.product_name || p.item_description || p.short_description_en || '-';
         pName = pName.replace(/[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/g, "").trim();
         pName = pName.replace(/^[\s\-\.|]+|[\s\-\.|]+$/g, "").trim(); // Clean leading/trailing separators
 
@@ -1733,7 +1733,7 @@ Al Habib Pharmacy Team`;
         doc.setTextColor(15, 61, 62); // Teal
         
         // Use English description for title
-        let titleName = p.short_description_en || p.item_description || p.product_name || '-';
+        let titleName = p.product_name || p.item_description || p.short_description_en || '-';
         // Filter Arabic
         titleName = titleName.replace(/[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/g, "").trim();
         titleName = titleName.replace(/^[\s\-\.|]+|[\s\-\.|]+$/g, "").trim();
@@ -1849,8 +1849,8 @@ Al Habib Pharmacy Team`;
         doc.setTextColor(0, 0, 0); // Correctly set text color to Black
         doc.setFontSize(8);
 
-        // Prioritize explicit English short description
-        let descText = p.short_description_en || p.item_description || p.product_name || '-';
+        // Use English description for full description
+        let descText = p.product_name || p.item_description || p.short_description_en || '-';
         
         // Remove Arabic characters to prevent garbage
         descText = descText.replace(/[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/g, "").trim();
