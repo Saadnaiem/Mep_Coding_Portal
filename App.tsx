@@ -153,6 +153,24 @@ const App: React.FC = () => {
     }
   }, [location.pathname]);
 
+  const [currentUserProfile, setCurrentUserProfile] = useState<any>(null);
+  const [currentUserEmployee, setCurrentUserEmployee] = useState<any>(null);
+  const [currentVendor, setCurrentVendor] = useState<any>(null);
+
+  // Database State
+  const [requests, setRequests] = useState<ProductRequest[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [actions, setActions] = useState<StepAction[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
+  const [assignedDivisions, setAssignedDivisions] = useState<string[]>([]);
+  // Delegation State
+  const [activeDelegations, setActiveDelegations] = useState<any[]>([]);
+  const [delegatedDivisions, setDelegatedDivisions] = useState<string[]>([]);
+
+  // Email Notification Queue State
+  const [pendingEmails, setPendingEmails] = useState<{to: string, subject: string, body: string, label: string}[]>([]);
+  const [showEmailModal, setShowEmailModal] = useState(false);
+
   // Restore Session on Mount
   useEffect(() => {
     const restoreSession = async () => {
@@ -227,24 +245,6 @@ const App: React.FC = () => {
         }
     }
   }, [view, selectedRequestId, isAuthenticated, location.pathname]);
-
-  const [currentUserProfile, setCurrentUserProfile] = useState<any>(null);
-  const [currentUserEmployee, setCurrentUserEmployee] = useState<any>(null);
-  const [currentVendor, setCurrentVendor] = useState<any>(null);
-
-  // Database State
-  const [requests, setRequests] = useState<ProductRequest[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [actions, setActions] = useState<StepAction[]>([]);
-  const [isSaving, setIsSaving] = useState(false);
-  const [assignedDivisions, setAssignedDivisions] = useState<string[]>([]);
-  // Delegation State
-  const [activeDelegations, setActiveDelegations] = useState<any[]>([]);
-  const [delegatedDivisions, setDelegatedDivisions] = useState<string[]>([]);
-
-  // Email Notification Queue State
-  const [pendingEmails, setPendingEmails] = useState<{to: string, subject: string, body: string, label: string}[]>([]);
-  const [showEmailModal, setShowEmailModal] = useState(false);
 
   // Load data from DB on mount
   useEffect(() => {
