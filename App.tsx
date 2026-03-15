@@ -1666,7 +1666,11 @@ Al Habib Pharmacy Team`;
     const sortedActions = [...requestActions].sort((a,b) => new Date(a.action_at).getTime() - new Date(b.action_at).getTime());
     
     const fullSequence = MOCK_STEPS.map(step => {
-        const stepActions = sortedActions.filter(a => a.step_number === step.step_number);
+        // Try strict match on step_number, fallback to role match for legacy data without step_number
+        const stepActions = sortedActions.filter(a => 
+            String(a.step_number) === String(step.step_number) || 
+            (!a.step_number && a.actor_role === step.role_required && a.action !== 'submit')
+        );
         const lastAction = stepActions.length > 0 ? stepActions[stepActions.length - 1] : null;
 
         let derivedStatus = 'PENDING';
@@ -1674,7 +1678,7 @@ Al Habib Pharmacy Team`;
         let textColor = [80, 80, 80];
 
         if (currentRequest.current_step > step.step_number) {
-            derivedStatus = 'COMPLETED';
+            derivedStatus = 'APPROVED'; // Changed from 'COMPLETED' to imply approval
             statusColor = [220, 252, 231]; // Light Green
             textColor = [22, 101, 52]; // Dark Green
         } else if (currentRequest.current_step === step.step_number) {
@@ -1726,7 +1730,7 @@ Al Habib Pharmacy Team`;
             statusLabel: derivedStatus,
             _statusColor: statusColor,
             _textColor: textColor,
-            actor: lastAction ? (lastAction.actor_name || 'Unknown') : '-',
+            actor: lastAction ? (lastAction.actor_name || 'Unknown') : (derivedStatus === 'APPROVED' ? 'System' : '-'),
             date: lastAction ? formatKSA(lastAction.action_at) : '-',
             comment: lastAction?.comment || '-'
         };
