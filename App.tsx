@@ -171,81 +171,6 @@ const App: React.FC = () => {
   const [pendingEmails, setPendingEmails] = useState<{to: string, subject: string, body: string, label: string}[]>([]);
   const [showEmailModal, setShowEmailModal] = useState(false);
 
-  // Restore Session on Mount
-  useEffect(() => {
-    const restoreSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (session?.user) {
-        // Fetch User Profile
-        const profile = await db.fetchProfile(session.user.id);
-        
-        if (profile) {
-            setCurrentUserProfile(profile);
-            
-            const isEmployee = profile.role !== 'vendor';
-            const isStaffUrl = location.pathname.startsWith('/staff');
-
-            if (isEmployee) {
-               // Redirect if on vendor page
-               if (!isStaffUrl) {
-                   navigate('/staff');
-               }
-               // activePortal syncs via another effect, but force set here to avoid render flicker if needed
-               // setActivePortal('employee'); 
-
-               setCurrentUserEmployee({
-                  id: profile.id,
-                  role: profile.role,
-                  full_name: profile.full_name
-               });
-            } else {
-               // Redirect if on staff page
-               if (isStaffUrl) {
-                   navigate('/');
-               }
-               
-               // Vendor Logic
-               const vendor = await db.getVendorByContactId(profile.id);
-               if (vendor) {
-                 setCurrentVendor(vendor);
-               }
-            }
-            
-            // Restore View from URL
-            const params = new URLSearchParams(location.search);
-            const savedView = params.get('view');
-            const savedId = params.get('id');
-            if (savedView) setView(savedView as any);
-            if (savedId) setSelectedRequestId(savedId);
-
-            setIsAuthenticated(true);
-        }
-      }
-    };
-    
-    restoreSession();
-  }, []);
-
-  // Sync View State to URL
-  useEffect(() => {
-    if (isAuthenticated) {
-        const params = new URLSearchParams(location.search);
-        const urlView = params.get('view');
-        const urlId = params.get('id');
-        
-        const currentId = selectedRequestId || null;
-
-        if (urlView !== view || urlId !== currentId) {
-            params.set('view', view);
-            if (selectedRequestId) params.set('id', selectedRequestId);
-            else params.delete('id');
-            
-            navigate(`${location.pathname}?${params.toString()}`, { replace: true });
-        }
-    }
-  }, [view, selectedRequestId, isAuthenticated, location.pathname]);
-
   // Load data from DB on mount
   useEffect(() => {
     if (!isAuthenticated) return; // Prevent data leak: Only fetch if authenticated
@@ -338,6 +263,81 @@ const App: React.FC = () => {
 
   // Modal State
   const [isActionModalOpen, setIsActionModalOpen] = useState(false);
+
+  // Restore Session on Mount
+  useEffect(() => {
+    const restoreSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session?.user) {
+        // Fetch User Profile
+        const profile = await db.fetchProfile(session.user.id);
+        
+        if (profile) {
+            setCurrentUserProfile(profile);
+            
+            const isEmployee = profile.role !== 'vendor';
+            const isStaffUrl = location.pathname.startsWith('/staff');
+
+            if (isEmployee) {
+               // Redirect if on vendor page
+               if (!isStaffUrl) {
+                   navigate('/staff');
+               }
+               // activePortal syncs via another effect, but force set here to avoid render flicker if needed
+               // setActivePortal('employee'); 
+
+               setCurrentUserEmployee({
+                  id: profile.id,
+                  role: profile.role,
+                  full_name: profile.full_name
+               });
+            } else {
+               // Redirect if on staff page
+               if (isStaffUrl) {
+                   navigate('/');
+               }
+               
+               // Vendor Logic
+               const vendor = await db.getVendorByContactId(profile.id);
+               if (vendor) {
+                 setCurrentVendor(vendor);
+               }
+            }
+            
+            // Restore View from URL
+            const params = new URLSearchParams(location.search);
+            const savedView = params.get('view');
+            const savedId = params.get('id');
+            if (savedView) setView(savedView as any);
+            if (savedId) setSelectedRequestId(savedId);
+
+            setIsAuthenticated(true);
+        }
+      }
+    };
+    
+    restoreSession();
+  }, []);
+
+  // Sync View State to URL
+  useEffect(() => {
+    if (isAuthenticated) {
+        const params = new URLSearchParams(location.search);
+        const urlView = params.get('view');
+        const urlId = params.get('id');
+        
+        const currentId = selectedRequestId || null;
+
+        if (urlView !== view || urlId !== currentId) {
+            params.set('view', view);
+            if (selectedRequestId) params.set('id', selectedRequestId);
+            else params.delete('id');
+            
+            navigate(`${location.pathname}?${params.toString()}`, { replace: true });
+        }
+    }
+  }, [view, selectedRequestId, isAuthenticated, location.pathname]);
   const [actionType, setActionType] = useState<'approve' | 'reject' | 'return'>('approve');
   const [actionComment, setActionComment] = useState('');
 
