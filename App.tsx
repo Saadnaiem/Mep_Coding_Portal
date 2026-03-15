@@ -992,9 +992,16 @@ Al Habib Pharmacy Team`;
         
         // --- Fonts ---
         let fontLoaded = false;
+        let boldFontLoaded = false;
         try {
             const fontUrl = 'https://raw.githubusercontent.com/google/fonts/main/ofl/amiri/Amiri-Regular.ttf';
-            const response = await fetch(fontUrl);
+            const fontBoldUrl = 'https://raw.githubusercontent.com/google/fonts/main/ofl/amiri/Amiri-Bold.ttf';
+            
+            const [response, responseBold] = await Promise.all([
+                fetch(fontUrl),
+                fetch(fontBoldUrl)
+            ]);
+
             if (response.ok) {
                 const buffer = await response.arrayBuffer();
                 let binary = '';
@@ -1004,6 +1011,17 @@ Al Habib Pharmacy Team`;
                 doc.addFont("Amiri-Regular.ttf", "Amiri", "normal");
                 fontLoaded = true;
             }
+
+            if (responseBold.ok) {
+                const buffer = await responseBold.arrayBuffer();
+                let binary = '';
+                const bytes = new Uint8Array(buffer);
+                for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+                doc.addFileToVFS("Amiri-Bold.ttf", btoa(binary));
+                doc.addFont("Amiri-Bold.ttf", "Amiri", "bold");
+                boldFontLoaded = true;
+            }
+
         } catch (e) { console.error("Font load error", e); }
 
         // --- Logo Helper ---
@@ -1343,10 +1361,17 @@ Al Habib Pharmacy Team`;
     const pageHeight = doc.internal.pageSize.height;
 
     // Load Arabic Font (Amiri)
+    let isArabicFontLoaded = false;
+    let isArabicBoldLoaded = false;
     try {
-        // Try GitHub Raw first (often more reliable for direct file access)
         const fontUrl = 'https://raw.githubusercontent.com/google/fonts/main/ofl/amiri/Amiri-Regular.ttf';
-        const response = await fetch(fontUrl);
+        const fontBoldUrl = 'https://raw.githubusercontent.com/google/fonts/main/ofl/amiri/Amiri-Bold.ttf';
+        
+        const [response, responseBold] = await Promise.all([
+            fetch(fontUrl),
+            fetch(fontBoldUrl)
+        ]);
+
         if (response.ok) {
             const buffer = await response.arrayBuffer();
             const bytes = new Uint8Array(buffer);
@@ -1354,24 +1379,25 @@ Al Habib Pharmacy Team`;
             for (let i = 0; i < bytes.byteLength; i++) {
                 binary += String.fromCharCode(bytes[i]);
             }
-            const base64Font = btoa(binary);
-            doc.addFileToVFS("Amiri-Regular.ttf", base64Font);
+            doc.addFileToVFS("Amiri-Regular.ttf", btoa(binary));
             doc.addFont("Amiri-Regular.ttf", "Amiri", "normal");
+            isArabicFontLoaded = true;
             console.log("Arabic font loaded successfully");
-        } else {
-            console.warn("Could not fetch Arabic font, status:", response.status);
-            // Fallback to Google Fonts CDN if GitHub fails
-            const backupUrl = 'https://fonts.gstatic.com/s/amiri/v26/J7aRnpd8CGxBHpUrtLMA7w.ttf';
-            const backupResp = await fetch(backupUrl);
-            if(backupResp.ok) {
-                const buff = await backupResp.arrayBuffer();
-                const bts = new Uint8Array(buff);
-                let bin = '';
-                for (let j = 0; j < bts.byteLength; j++) bin += String.fromCharCode(bts[j]);
-                doc.addFileToVFS("Amiri-Regular.ttf", btoa(bin));
-                doc.addFont("Amiri-Regular.ttf", "Amiri", "normal");
-            }
         }
+        
+        if (responseBold.ok) {
+            const buffer = await responseBold.arrayBuffer();
+            const bytes = new Uint8Array(buffer);
+            let binary = '';
+            for (let i = 0; i < bytes.byteLength; i++) {
+                binary += String.fromCharCode(bytes[i]);
+            }
+            doc.addFileToVFS("Amiri-Bold.ttf", btoa(binary));
+            doc.addFont("Amiri-Bold.ttf", "Amiri", "bold");
+            isArabicBoldLoaded = true;
+            console.log("Arabic Bold font loaded successfully");
+        }
+
     } catch (e) {
         console.error("Error loading Arabic font:", e);
     }
@@ -1459,19 +1485,29 @@ Al Habib Pharmacy Team`;
       ],
       theme: 'grid',
       headStyles: { fillColor: [15, 61, 62], textColor: 255, fontStyle: 'bold' },
-      styles: { fontSize: 9, cellPadding: 4, valign: 'middle' },
+      styles: { 
+          fontSize: 9, 
+          cellPadding: 4, 
+          valign: 'middle',
+          font: isArabicFontLoaded ? "Amiri" : "helvetica",
+          fontStyle: isArabicFontLoaded ? "normal" : "normal"
+      },
       columnStyles: {
           0: { fontStyle: 'bold', cellWidth: 35, fillColor: [248, 250, 250], textColor: [15, 61, 62] },
-          2: { fontStyle: 'bold', cellWidth: 35, fillColor: [248, 250, 250], textColor: [15, 61, 62] }
+          1: { fontStyle: 'bold', textColor: [0, 0, 0] }, // Bold Black for Detail Value
+          2: { fontStyle: 'bold', cellWidth: 35, fillColor: [248, 250, 250], textColor: [15, 61, 62] },
+          3: { fontStyle: 'bold', textColor: [0, 0, 0] }  // Bold Black for Detail Value
       }
     });
 
     // --- PAGE 2: PRODUCT LISTING SUMMARY ---
-    doc.addPage();
+    // User requested Landscape to fit more text
+    doc.addPage("a4", "l");
+    const pageWidthLandscape = doc.internal.pageSize.getWidth();
     
     // Modern Header Bar
     doc.setFillColor(15, 61, 62); // Teal
-    doc.rect(0, 15, pageWidth, 14, 'F');
+    doc.rect(0, 15, pageWidthLandscape, 14, 'F');
     
     doc.setFont("helvetica", "bold");
     doc.setFontSize(14);
@@ -1481,15 +1517,21 @@ Al Habib Pharmacy Team`;
     // Gold Accent Line under header
     doc.setDrawColor(197, 160, 101); 
     doc.setLineWidth(0.8);
-    doc.line(0, 29, pageWidth, 29);
+    doc.line(0, 29, pageWidthLandscape, 29);
 
     const productSummaryBody = requestProducts.map(p => {
         const margin = (p.price_cost && p.price_retail && Number(p.price_retail) > 0) 
             ? ((1 - (Number(p.price_cost) / Number(p.price_retail))) * 100).toFixed(2) + '%' 
             : '-';
+        
+        // Filter out Arabic characters from the name to ensure English display
+        let pName = p.short_description_en || p.item_description || p.product_name || '-';
+        pName = pName.replace(/[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/g, "").trim();
+        pName = pName.replace(/^[\s\-\.|]+|[\s\-\.|]+$/g, "").trim(); // Clean leading/trailing separators
+
         return [
             p.brand || '-',
-            p.product_name || '-',
+            pName || '-', 
             `${p.currency || ''} ${Number(p.price_cost || 0).toFixed(2)}`,
             `${p.currency || ''} ${Number(p.price_retail || 0).toFixed(2)}`,
             margin,
@@ -1502,21 +1544,34 @@ Al Habib Pharmacy Team`;
         head: [['Brand', 'Product Name', 'Cost Price', 'Selling Price', 'Margin', 'Taxable']],
         body: productSummaryBody,
         theme: 'grid',
-        headStyles: { fillColor: [15, 61, 62], textColor: 255, fontStyle: 'bold' },
+        headStyles: { 
+            fillColor: [15, 61, 62], 
+            textColor: 255, 
+            fontStyle: 'bold',
+            font: isArabicBoldLoaded ? "Amiri" : "helvetica" 
+        },
         bodyStyles: { textColor: [15, 61, 62] },
-        styles: { fontSize: 9, cellPadding: 3, valign: 'middle' },
+        styles: { 
+            fontSize: 10, // Increased font size for readability
+            cellPadding: 4, 
+            valign: 'middle',
+            // Use Amiri to safely render mixed content without symbols
+            font: isArabicFontLoaded ? "Amiri" : "helvetica",
+            fontStyle: "normal"
+        },
         columnStyles: {
-            0: { fontStyle: 'bold', cellWidth: 35 },
-            1: { cellWidth: 'auto' },
-            2: { halign: 'right', cellWidth: 30, fontStyle: 'bold', textColor: [225, 29, 72] }, // Rose Red for Cost
-            3: { halign: 'right', cellWidth: 30, fontStyle: 'bold', textColor: [5, 150, 105] }, // Emerald Green for Selling
-            4: { halign: 'center', cellWidth: 20, fontStyle: 'bold', textColor: [37, 99, 235] }, // Blue for Margin
-            5: { halign: 'center', cellWidth: 20 }
+            0: { fontStyle: 'bold', cellWidth: 35 }, // Brand
+            1: { cellWidth: 'auto', fontStyle: 'bold' }, // Product Name
+            2: { halign: 'right', cellWidth: 30, fontStyle: 'bold', textColor: [225, 29, 72] }, // Cost Price
+            3: { halign: 'right', cellWidth: 32, fontStyle: 'bold', textColor: [5, 150, 105] }, // Selling Price
+            4: { halign: 'center', cellWidth: 22, fontStyle: 'bold', textColor: [37, 99, 235] }, // Margin
+            5: { halign: 'center', cellWidth: 20 } // Taxable
         }
     });
 
     // --- PAGE 3: APPROVAL SEQUENCE & HISTORY ---
-    doc.addPage();
+    // Switch back to Portrait
+    doc.addPage("a4", "p");
     
     // Modern Header Bar
     doc.setFillColor(15, 61, 62); // Teal
@@ -1609,12 +1664,23 @@ Al Habib Pharmacy Team`;
       body: fullSequence.map(i => [i.step, i.role, '', i.actor, i.date, i.comment]), 
       theme: 'grid',
       headStyles: { fillColor: [15, 61, 62], textColor: 255, fontStyle: 'bold', minCellHeight: 12, valign: 'middle' },
-      styles: { fontSize: 8, valign: 'middle', cellPadding: 4, lineColor: [230,230,230], lineWidth: 0.1 },
+      styles: { 
+          fontSize: 8, 
+          valign: 'middle', 
+          cellPadding: 4, 
+          lineColor: [230,230,230], 
+          lineWidth: 0.1,
+          font: isArabicFontLoaded ? "Amiri" : "helvetica",
+          fontStyle: isArabicFontLoaded ? "normal" : "normal"
+      },
+      // Make the detail field, role/responsibility, actor, timestamp, comments bold
       columnStyles: { 
-          0: { cellWidth: 15, fontStyle: 'bold' }, 
-          1: { cellWidth: 40 },
-          2: { cellWidth: 30, halign: 'center' },
-          5: { cellWidth: 'auto', fontSize: 7, textColor: [100,100,100] } 
+          0: { cellWidth: 15, fontStyle: 'bold' }, // Step (Detail Field)
+          1: { cellWidth: 40, fontStyle: 'bold' }, // Role/Responsibility
+          2: { cellWidth: 30, halign: 'center' }, // Status (Has custom renderer)
+          3: { fontStyle: 'bold' }, // Actor
+          4: { fontStyle: 'bold' }, // Timestamp
+          5: { cellWidth: 'auto', fontSize: 7, textColor: [50, 50, 50], fontStyle: 'bold' } // Comments (Darker + Bold)
       },
       didDrawCell: (data) => {
           if (data.section === 'body' && data.column.index === 2) {
@@ -1657,18 +1723,33 @@ Al Habib Pharmacy Team`;
         // Approx height of product block is ~120mm now (with descriptions)
         checkPageBreak(120);
         
-        // --- Header Section ---
-        doc.setFontSize(14);
-        doc.setFont("helvetica", "bold");
+        // --- Header Section - prominent and English ---
+        doc.setFontSize(16); // Larger font
+        if (isArabicBoldLoaded) {
+            doc.setFont("Amiri", "bold");
+        } else {
+            doc.setFont("helvetica", "bold"); 
+        }
         doc.setTextColor(15, 61, 62); // Teal
-        doc.text(`${index + 1}. ${p.product_name}`, 15, yPos + 6);
         
-        doc.setFontSize(10);
-        doc.setFont("helvetica", "normal");
+        // Use English description for title
+        let titleName = p.short_description_en || p.item_description || p.product_name || '-';
+        // Filter Arabic
+        titleName = titleName.replace(/[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/g, "").trim();
+        titleName = titleName.replace(/^[\s\-\.|]+|[\s\-\.|]+$/g, "").trim();
+
+        doc.text(`${index + 1}. ${titleName || '-'}`, 15, yPos + 6);
+        
+        doc.setFontSize(11); // Slightly larger brand
+        if (isArabicFontLoaded) doc.setFont("Amiri", "normal");
+        else doc.setFont("helvetica", "normal");
+        
         doc.text(String(p.brand || ''), 15, yPos + 12);
 
         // Price Top Right
-        doc.setFont("helvetica", "bold");
+        if (isArabicBoldLoaded) doc.setFont("Amiri", "bold");
+        else doc.setFont("helvetica", "bold");
+        
         doc.setFontSize(14);
         doc.setTextColor(15, 61, 62);
         doc.text(`${p.currency || ''} ${p.price_retail || '0'}`, pageWidth - 15, yPos + 6, { align: 'right' });
@@ -1680,7 +1761,9 @@ Al Habib Pharmacy Team`;
 
         // --- Hierarchy Section ---
         doc.setFontSize(8);
-        doc.setFont("helvetica", "bold");
+        if (isArabicBoldLoaded) doc.setFont("Amiri", "bold");
+        else doc.setFont("helvetica", "bold");
+        
         doc.setTextColor(15, 61, 62);
         doc.text("Product Hierarchy Selection", 22, yPos); 
         doc.setDrawColor(15, 61, 62);
@@ -1694,18 +1777,54 @@ Al Habib Pharmacy Team`;
 
         hValues.forEach((val, i) => {
             const bx = 15 + (boxWidth + 2) * i;
-            doc.setFillColor(240, 244, 244); // Light Teal/Gray
-            doc.roundedRect(bx, yPos, boxWidth, 14, 1, 1, 'F');
+            
+            // Draw Connector Arrow (except for last item)
+            if (i < hLabels.length - 1) {
+                const arrowX = bx + boxWidth + 1;
+                const arrowY = yPos + 7;
+                doc.setDrawColor(200);
+                doc.setLineWidth(0.3);
+                // Simple chevron >
+                doc.line(arrowX - 0.5, arrowY - 1, arrowX + 0.5, arrowY);
+                doc.line(arrowX - 0.5, arrowY + 1, arrowX + 0.5, arrowY);
+            }
 
-            doc.setFontSize(5);
-            doc.setTextColor(100);
+            // Box
+            doc.setFillColor(248, 250, 250); // Very light background
+            doc.setDrawColor(15, 61, 62); // Teal Border
+            doc.setLineWidth(0.1);
+            doc.roundedRect(bx, yPos, boxWidth, 14, 1, 1, 'FD'); // Fill and Draw
+
+            // Label (Top)
+            doc.setFontSize(6);
+            doc.setTextColor(100, 100, 100); // Gray
+            doc.setFont("helvetica", "bold");
             doc.text(hLabels[i].toUpperCase(), bx + 2, yPos + 4);
 
-            doc.setFontSize(6);
-            doc.setTextColor(15, 61, 62);
-            doc.setFont("helvetica", "bold");
-            const splitText = doc.splitTextToSize(String(val || '-'), boxWidth - 3);
-            doc.text(splitText, bx + 2, yPos + 9);
+            // Value (Bottom)
+            doc.setFontSize(8); // Increased size
+            doc.setTextColor(0, 0, 0); // Black for visibility
+            
+            // Check for Arabic content or fallback to Arabic font if loaded to correspond with user preferences
+            const cleanVal = String(val || '-').trim();
+            const hasArabic = /[\u0600-\u06FF]/.test(cleanVal);
+            
+            if (hasArabic && isArabicFontLoaded) {
+                 doc.setFont("Amiri", "bold");
+            } else {
+                 doc.setFont("helvetica", "bold");
+            }
+            
+            // Handle long text wrapping
+            const splitVal = doc.splitTextToSize(cleanVal, boxWidth - 3);
+            
+            // If text wraps to 2 lines, adjust y slightly
+            if (splitVal.length > 1) {
+                 doc.setFontSize(7); // Shrink slightly for long text
+                 doc.text(splitVal, bx + 2, yPos + 8);
+            } else {
+                 doc.text(splitVal, bx + 2, yPos + 10);
+            }
         });
 
         yPos += 20;
@@ -1722,15 +1841,24 @@ Al Habib Pharmacy Team`;
 
         // Body
         doc.setFillColor(248, 250, 250);
-        doc.rect(15, yPos + 6, pageWidth - 30, 20, 'F'); // Content box
         doc.setDrawColor(220, 220, 220);
-        doc.rect(15, yPos + 6, pageWidth - 30, 20, 'S'); // Border
+        doc.rect(15, yPos + 6, pageWidth - 30, 20, 'FD'); // Fill and Draw
 
-        doc.setFontSize(9);
-        doc.setTextColor(15, 61, 62);
-        doc.setFont("helvetica", "normal");
-        const descEn = doc.splitTextToSize(String(p.item_description || p.product_name || '-'), pageWidth - 34);
-        doc.text(descEn, 17, yPos + 11);
+        // Force Helvetica for English Only Description
+        doc.setFont("helvetica", "bold"); // Bold for better readability
+        doc.setTextColor(0, 0, 0); // Correctly set text color to Black
+        doc.setFontSize(8);
+
+        // Prioritize explicit English short description
+        let descText = p.short_description_en || p.item_description || p.product_name || '-';
+        
+        // Remove Arabic characters to prevent garbage
+        descText = descText.replace(/[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/g, "").trim();
+        // Remove left-over separators
+        descText = descText.replace(/^[\s\-\.|]+|[\s\-\.|]+$/g, "").trim();
+
+        const descEnString = doc.splitTextToSize(descText || '-', pageWidth - 34);
+        doc.text(descEnString, 17, yPos + 11);
         
         yPos += 28; // Increased spacing
 
@@ -1805,19 +1933,19 @@ Al Habib Pharmacy Team`;
                  doc.roundedRect(x - 2, y - 3, boxWidth, 12, 1, 1, 'F');
             }
 
-            // LABEL
-            doc.setFontSize(isProminent ? 7 : 6); // Increased base size
-            doc.setTextColor(isProminent ? 15 : 100, isProminent ? 61 : 100, isProminent ? 62 : 100);
+            // LABEL (Criteria ID) - Bold and Strong Color
+            doc.setFontSize(isProminent ? 7 : 6); 
+            doc.setTextColor(15, 61, 62); // Dark Teal (Stronger than gray)
             doc.setFont("helvetica", "bold");
             doc.text(lbl.toUpperCase(), x, y);
             
-            // VALUE
-            doc.setFontSize(isProminent ? 11 : 9); // Increased base size
-            doc.setTextColor(15, 61, 62);
-            doc.setFont("helvetica", isProminent ? "bold" : "normal");
+            // VALUE - Black Color
+            doc.setFontSize(isProminent ? 11 : 9); 
+            doc.setTextColor(0, 0, 0); // Black
+            doc.setFont("helvetica", "bold"); // Always bold
             doc.text(String(val || '-'), x, y + 4 + (isProminent ? 1 : 0));
             
-            return y + (isProminent ? 18 : 15); // Increased spacing
+            return y + (isProminent ? 18 : 15); 
         };
 
         // Column 1
@@ -2018,28 +2146,32 @@ Al Habib Pharmacy Team`;
     for (let i = 1; i <= totalPages; i++) {
         doc.setPage(i);
         
+        // Get dimensions for CURRENT page (handles mixed Portrait/Landscape)
+        const currentW = doc.internal.pageSize.getWidth();
+        const currentH = doc.internal.pageSize.getHeight();
+        
         // 1. Logo Logic
         if (logoImg) {
             if (i === 1) {
                 // Page 1: Top Center - Prominent Size
                 const p1Width = 70; // Larger width for cover page
                 const p1Height = (logoImg.height * p1Width) / logoImg.width;
-                doc.addImage(logoImg, 'PNG', (pageWidth - p1Width) / 2, 5, p1Width, p1Height);
+                doc.addImage(logoImg, 'PNG', (currentW - p1Width) / 2, 5, p1Width, p1Height);
             } else {
                 // Page 2+: Top Right - Standard Size
                 const targetWidth = 40; 
                 const targetHeight = (logoImg.height * targetWidth) / logoImg.width;
-                doc.addImage(logoImg, 'PNG', pageWidth - targetWidth - 10, 5, targetWidth, targetHeight);
+                doc.addImage(logoImg, 'PNG', currentW - targetWidth - 10, 5, targetWidth, targetHeight);
             }
         }
 
         // 2. Footer (Enhanced)
-        const footerY = pageHeight - 10;
+        const footerY = currentH - 10;
         
         // Decorative Line
         doc.setDrawColor(197, 160, 101); // Gold
         doc.setLineWidth(0.5);
-        doc.line(15, footerY - 5, pageWidth - 15, footerY - 5);
+        doc.line(15, footerY - 5, currentW - 15, footerY - 5);
 
         // Left: Branding
         doc.setFont("helvetica", "bold");
@@ -2057,14 +2189,14 @@ Al Habib Pharmacy Team`;
         doc.setTextColor(150);
         const timeText = `Generated: ${timestamp}`;
         const timeW = doc.getTextWidth(timeText);
-        doc.text(timeText, (pageWidth - timeW) / 2, footerY);
+        doc.text(timeText, (currentW - timeW) / 2, footerY);
 
         // Right: Page Number
         doc.setFontSize(8);
         doc.setTextColor(100);
         const pageText = `Page ${i} of ${totalPages}`;
         const pageW = doc.getTextWidth(pageText);
-        doc.text(pageText, pageWidth - 15 - pageW, footerY);
+        doc.text(pageText, currentW - 15 - pageW, footerY);
     }
 
     doc.save(`Request_${currentRequest.request_number}_Report.pdf`);
