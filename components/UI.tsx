@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Check } from 'lucide-react';
+import { Check, Clock } from 'lucide-react';
 import { STATUS_MAP } from '../constants';
 import { RequestStatus } from '../types';
 
@@ -169,21 +169,23 @@ export const Stepper: React.FC<{ currentStep: number; totalSteps: number; labels
         const stepNum = i + 1;
         const isActive = stepNum === currentStep;
         const isCompleted = stepNum < currentStep;
-        // On mobile, only show label if active or first/last to save space
-        // OR better: use a staggered display or simple scroll
         
         return (
           <div key={i} className="relative z-10 flex flex-col items-center flex-1 min-w-[40px] md:min-w-auto">
+            {/* Circle - Reverted to Vivid Status as Requested */}
             <div className={`w-8 h-8 md:w-12 md:h-12 rounded-full flex items-center justify-center border-2 md:border-[3px] transition-all duration-500 bg-white ${
               isActive ? 'border-[#C5A065] text-[#0F3D3E] shadow-xl shadow-[#C5A065]/20 scale-110' : 
               isCompleted ? 'border-[#0F3D3E] bg-[#0F3D3E] text-[#C5A065]' : 
-              'border-gray-100 text-gray-300'
+              'border-[#0F3D3E]/30 text-[#0F3D3E]/60 bg-[#F0F4F4]'
             }`}>
-              {isCompleted ? <Check className="w-3 h-3 md:w-5 md:h-5" /> : <span className="text-xs md:text-sm font-serif font-bold">{stepNum}</span>}
+              {isCompleted ? <Check className="w-3 h-3 md:w-5 md:h-5" /> : (isActive ? <Clock className="w-3 h-3 md:w-5 md:h-5 text-[#0F3D3E]" /> : <span className="text-xs md:text-sm font-serif font-bold">{stepNum}</span>)}
             </div>
-            {/* Logic to hide labels on mobile to prevent overlap, show only active step label on mobile */}
-            <span className={`absolute top-10 md:top-14 w-20 md:w-32 left-1/2 -translate-x-1/2 text-center text-[7px] md:text-[9px] font-serif font-bold uppercase tracking-wider leading-tight 
-                ${isActive ? 'opacity-100 z-20 text-[#C5A065]' : isCompleted ? 'hidden md:opacity-100 md:block text-[#0F3D3E]' : 'hidden md:opacity-100 md:block text-gray-300'}
+            
+            {/* Labels - Clear, Colored, Informative (Maintained from previous update) */}
+            <span className={`absolute top-10 md:top-14 w-24 md:w-40 left-1/2 -translate-x-1/2 text-center font-serif font-bold uppercase tracking-tight leading-tight transition-all duration-300
+              ${isActive ? 'opacity-100 z-20 text-[#0F3D3E] text-[10px] md:text-xs scale-110 font-black' : 
+                isCompleted ? 'hidden md:opacity-100 md:block text-[#0F3D3E]/70 text-[9px] md:text-[10px]' : 
+                'hidden md:opacity-100 md:block text-[#0F3D3E]/60 text-[9px]'}
             `}>
               {labels[i]}
             </span>

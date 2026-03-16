@@ -64,7 +64,7 @@ import { ExistingModificationsReport } from './components/ExistingModificationsR
 import { RequestStatus, ProductRequest, UserType, EmployeeRole, Product, StepAction, HierarchyNode, Vendor, ActionType } from './types';
 import { ROLE_LABELS, STATUS_MAP, BRAND_AR_MAP } from './constants';
 
-const EditableField = ({ label, value, onChange, type = 'text', options }: any) => {
+const EditableField = ({ label, value, onChange, type = 'text', options, disabled }: any) => {
     const [localValue, setLocalValue] = useState(value);
     
     useEffect(() => {
@@ -74,10 +74,11 @@ const EditableField = ({ label, value, onChange, type = 'text', options }: any) 
     if (options) {
         return (
             <div className="w-full">
-                {label && <p className="text-[#0F3D3E]/60 text-[9px] font-bold uppercase mb-1">{label}</p>}
+                {label && <p className="text-xs uppercase font-black text-[#0F3D3E] tracking-widest mb-1">{label}</p>}
                 <Select 
                     options={options} 
                     value={String(localValue)} 
+                    disabled={disabled}
                     onChange={e => {
                         const val = e.target.value;
                         setLocalValue(val);
@@ -90,10 +91,11 @@ const EditableField = ({ label, value, onChange, type = 'text', options }: any) 
 
     return (
         <div className="w-full">
-            {label && <p className="text-[#0F3D3E]/60 text-[9px] font-bold uppercase mb-1">{label}</p>}
+            {label && <p className="text-xs uppercase font-black text-[#0F3D3E] tracking-widest mb-1">{label}</p>}
             <Input 
                 type={type} 
                 value={String(localValue)} 
+                disabled={disabled}
                 onChange={e => setLocalValue(e.target.value)} 
                 onBlur={() => onChange(localValue)}
                 className="!py-2 !px-3" 
@@ -355,6 +357,7 @@ const App: React.FC = () => {
   const [newReqProducts, setNewReqProducts] = useState<Product[]>([]);
   
   // Shared Editable State for Products (used by RequestDetails and Actions)
+  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [editableProducts, setEditableProducts] = useState<Product[]>([]);
   
   const handleAddProduct = (newProduct: Product) => {
@@ -364,6 +367,7 @@ const App: React.FC = () => {
   // Load specific data when request selected
   useEffect(() => {
     if (selectedRequestId && view === 'request_details') {
+        setSelectedProductId(null); // Reset detail view when entering a request
         const loadDetails = async () => {
             // Fetch fresh request details to ensure Vendor Documents are up-to-date
             const freshRequest = await db.fetchRequestById(selectedRequestId);
@@ -554,6 +558,7 @@ const App: React.FC = () => {
     setAssignedDivisions([]);
     setView('dashboard');
     setSelectedRequestId(null);
+    setSelectedProductId(null);
     setAuthForm({
       email: '',
       password: '',
@@ -716,16 +721,17 @@ const App: React.FC = () => {
     let nextStatus: RequestStatus = currentRequest.status;
 
     if (actionType === 'approve') {
-      // Logic for Saving Product Changes at Step 7 (ERP Code Issuance) or anytime user approves changes
-      if (currentRequest.current_step === 7 && editableProducts.length > 0) {
+      // Logic for Saving Product Changes - If user edited anything (e.g. Category Manager filling fees, or ERP filling codes)
+      // This ensures any changes made by the approver are persisted permanently before moving to next step
+      if (editableProducts.length > 0) {
           try {
              for (const p of editableProducts) {
                  const { id, ...rest } = p;
-                 await db.updateProduct(id, rest); // Save changes (e.g. Item Code)
+                 await db.updateProduct(id, rest); 
              }
           } catch(e) {
               console.error("Failed to save product updates during approval", e);
-              alert("Warning: Failed to save product updates. Check console.");
+              alert("Warning: Failed to save product updates before approval. Proceeding.");
           }
       }
 
@@ -1316,7 +1322,7 @@ Al Habib Pharmacy Team`;
             // 2. Product Identification 
             "Brand (EN)": p.brand || '',
             "Barcode": p.barcode,
-            "Item Description (EN)": (p.item_description || p.product_name || '').replace(/(\r\n|\n|\r)/gm, " "),
+            "Item Description (EN)": (p.product_name || '').replace(/(\r\n|\n|\r)/gm, " "),
             "Item Description (AR)": (p.product_name_ar || '').replace(/(\r\n|\n|\r)/gm, " "),
 
             // 3. Hierarchy
@@ -1803,7 +1809,7 @@ Al Habib Pharmacy Team`;
         checkPageBreak(120);
         
         // --- Header Section - prominent and English ---
-        doc.setFontSize(16); // Larger font
+        doc.setFontSize(11); // Standard font size
         if (isArabicBoldLoaded) {
             doc.setFont("Amiri", "bold");
         } else {
@@ -1819,11 +1825,23 @@ Al Habib Pharmacy Team`;
 
         doc.text(`${index + 1}. ${titleName || '-'}`, 15, yPos + 6);
         
-        doc.setFontSize(11); // Slightly larger brand
-        if (isArabicFontLoaded) doc.setFont("Amiri", "normal");
-        else doc.setFont("helvetica", "normal");
+        // Brand Name Styled Box
+        doc.setFillColor(250, 248, 245); // Very light warm gray/gold tint
+        doc.setDrawColor(197, 160, 101); // Gold Border
+        doc.setLineWidth(0.5);
+        // Calculate dynamic width based on brand name length approx
+        const brandStr = String(p.brand || '');
+        const brandWidth = doc.getTextWidth(brandStr) + 12; // padding
+        const finalBrandWidth = Math.max(brandWidth, 40); // Min width
+
+        doc.roundedRect(15, yPos + 9, finalBrandWidth, 10, 2, 2, 'FD');
         
-        doc.text(String(p.brand || ''), 15, yPos + 12);
+        doc.setFontSize(12); 
+        doc.setTextColor(15, 61, 62); // Teal
+        if (isArabicBoldLoaded) doc.setFont("Amiri", "bold");
+        else doc.setFont("helvetica", "bold");
+        
+        doc.text(brandStr, 18, yPos + 15.5);
 
         // Price Top Right
         if (isArabicBoldLoaded) doc.setFont("Amiri", "bold");
@@ -1836,7 +1854,7 @@ Al Habib Pharmacy Team`;
         doc.setTextColor(150);
         doc.text("RETAIL PRICE", pageWidth - 15, yPos + 11, { align: 'right' });
 
-        yPos += 20;
+        yPos += 24; // Compact spacing
 
         // --- Hierarchy Section ---
         doc.setFontSize(8);
@@ -1906,14 +1924,14 @@ Al Habib Pharmacy Team`;
             }
         });
 
-        yPos += 20;
+        yPos += 16;
 
         // --- Descriptions Block (Full Width) ---
         // English Description
         // Header
         doc.setFillColor(15, 61, 62); // Teal
         doc.rect(15, yPos, pageWidth - 30, 6, 'F');
-        doc.setFontSize(7);
+        doc.setFontSize(8); // Header Label Size
         doc.setTextColor(255, 255, 255);
         doc.setFont("helvetica", "bold");
         doc.text("FULL PRODUCT DESCRIPTION (ENGLISH)", 17, yPos + 4);
@@ -1921,12 +1939,12 @@ Al Habib Pharmacy Team`;
         // Body
         doc.setFillColor(248, 250, 250);
         doc.setDrawColor(220, 220, 220);
-        doc.rect(15, yPos + 6, pageWidth - 30, 20, 'FD'); // Fill and Draw
+        doc.rect(15, yPos + 6, pageWidth - 30, 12, 'FD'); // Reduced Height
 
         // Force Helvetica for English Only Description
         doc.setFont("helvetica", "bold"); // Bold for better readability
         doc.setTextColor(0, 0, 0); // Correctly set text color to Black
-        doc.setFontSize(8);
+        doc.setFontSize(10); // Standard value size
 
         // Use English description for full description
         let descText = p.product_name || p.item_description || p.short_description_en || '-';
@@ -1937,25 +1955,26 @@ Al Habib Pharmacy Team`;
         descText = descText.replace(/^[\s\-\.|]+|[\s\-\.|]+$/g, "").trim();
 
         const descEnString = doc.splitTextToSize(descText || '-', pageWidth - 34);
-        doc.text(descEnString, 17, yPos + 11);
+        doc.setFontSize(10); // Standard font size for value
+        doc.text(descEnString, 17, yPos + 10); // Adjusted text Y pos
         
-        yPos += 28; // Increased spacing
+        yPos += 16; // Reduced Spacing
 
         // Arabic Description
         // Header
         doc.setFillColor(15, 61, 62); 
         doc.rect(15, yPos, pageWidth - 30, 6, 'F');
-        doc.setFontSize(7);
+        doc.setFontSize(8); // Header Label Size
         doc.setTextColor(255, 255, 255);
         doc.setFont("helvetica", "bold");
         doc.text("ARABIC DESCRIPTION", 17, yPos + 4);
         
         // Body
         doc.setFillColor(248, 250, 250);
-        doc.rect(15, yPos + 6, pageWidth - 30, 20, 'F');
-        doc.rect(15, yPos + 6, pageWidth - 30, 20, 'S');
+        doc.rect(15, yPos + 6, pageWidth - 30, 12, 'F'); // Reduced Height
+        doc.rect(15, yPos + 6, pageWidth - 30, 12, 'S');
 
-        doc.setFontSize(9);
+        doc.setFontSize(10); // Arabic Value Size
         doc.setTextColor(15, 61, 62);
 
         // Check if Arabic font is loaded, otherwise fallback to helvetica
@@ -1966,25 +1985,24 @@ Al Habib Pharmacy Team`;
             doc.setFont("Amiri", "normal");
             try {
                 const arText = String(p.product_name_ar || '-');
-                doc.text(arText, pageWidth - 19, yPos + 11, { 
+                doc.text(arText, pageWidth - 19, yPos + 10, { // Adjusted text Y pos
                     align: 'right', 
                     maxWidth: safeWidth - 8
                 });
             } catch (err) {
                 // Fallback if formatting fails
-                doc.text(String(p.product_name_ar || '-'), pageWidth - 19, yPos + 11, { align: 'right' });
+                doc.text(String(p.product_name_ar || '-'), pageWidth - 19, yPos + 10, { align: 'right' });
             }
         } else {
              doc.setFont("helvetica", "normal"); 
              const descAr = doc.splitTextToSize(String(p.product_name_ar || '-'), safeWidth - 8);
-             doc.text(descAr, pageWidth - 19, yPos + 11, { align: 'right' }); 
+             doc.text(descAr, pageWidth - 19, yPos + 10, { align: 'right' }); 
         }
         
         // Reset Font
         doc.setFont("helvetica", "normal");
 
-        yPos += 30; 
-
+        yPos += 16; 
 
         // --- Specs Section ---
         doc.setFontSize(8);
@@ -1999,37 +2017,49 @@ Al Habib Pharmacy Team`;
         // Helper to draw fields in columns
         const drawField = (lbl: string, val: any, x: number, y: number, isProminent: boolean = false) => {
             const boxWidth = colW - 5;
+            const isBrand = lbl === "Brand Name";
             
             // Background box for better readability
-            doc.setFillColor(isProminent ? 240 : 252, isProminent ? 255 : 252, isProminent ? 245 : 252);
-            if (isProminent) {
-                // Stronger border for prominent
-                 doc.setDrawColor(15, 61, 62); 
-                 doc.setLineWidth(0.5);
-                 doc.roundedRect(x - 2, y - 3, boxWidth, 14, 1, 1, 'FD');
+            if (isBrand) {
+                // No Frame for Brand
             } else {
-                 // Subtle background for others
-                 doc.roundedRect(x - 2, y - 3, boxWidth, 12, 1, 1, 'F');
+                doc.setFillColor(isProminent ? 240 : 252, isProminent ? 255 : 252, isProminent ? 245 : 252);
+                if (isProminent) {
+                    // Stronger border for prominent
+                     doc.setDrawColor(15, 61, 62); 
+                     doc.setLineWidth(0.5);
+                     doc.roundedRect(x - 2, y - 3, boxWidth, 14, 1, 1, 'FD');
+                } else {
+                     // Subtle background for others
+                     doc.roundedRect(x - 2, y - 3, boxWidth, 12, 1, 1, 'F');
+                }
             }
 
             // LABEL (Criteria ID) - Bold and Strong Color
-            doc.setFontSize(isProminent ? 7 : 6); 
+            doc.setFontSize((isProminent || isBrand) ? 7 : 6); 
             doc.setTextColor(15, 61, 62); // Dark Teal (Stronger than gray)
             doc.setFont("helvetica", "bold");
             doc.text(lbl.toUpperCase(), x, y);
             
             // VALUE - Black Color
-            doc.setFontSize(isProminent ? 11 : 9); 
-            doc.setTextColor(0, 0, 0); // Black
-            doc.setFont("helvetica", "bold"); // Always bold
-            doc.text(String(val || '-'), x, y + 4 + (isProminent ? 1 : 0));
+            if (isBrand) {
+                 doc.setFontSize(14); 
+                 doc.setTextColor(15, 61, 62); // Dark Teal
+                 doc.setFont("helvetica", "bold"); 
+                 doc.text(String(val || '-'), x, y + 7);
+            } else {
+                doc.setFontSize(isProminent ? 11 : 9); 
+                doc.setTextColor(0, 0, 0); // Black
+                doc.setFont("helvetica", "bold"); // Always bold
+                doc.text(String(val || '-'), x, y + 4 + (isProminent ? 1 : 0));
+            }
             
-            return y + (isProminent ? 18 : 15); 
+            return y + (isBrand ? 24 : (isProminent ? 18 : 15)); 
         };
 
         // Column 1
         let cy1 = yPos;
-        cy1 = drawField("Brand Name", p.brand, 15, cy1);
+        // cy1 = drawField("Brand Name", p.brand, 15, cy1); // Moved to top
         cy1 = drawField("Barcode", p.barcode, 15, cy1);
         cy1 = drawField("Manufacturer", p.manufacturer, 15, cy1);
         cy1 = drawField("Origin", p.country_of_origin, 15, cy1);
@@ -2037,6 +2067,7 @@ Al Habib Pharmacy Team`;
         cy1 = drawField("Item Code", p.erp_item_code, 15, cy1, true);
         cy1 = drawField("Item Group", p.item_group, 15, cy1);
         cy1 = drawField("Item Sub Group", p.item_sub_group, 15, cy1);
+        cy1 = drawField("Vendor No", p.vendor_no, 15, cy1);
 
         // Column 2
         let cy2 = yPos;
@@ -2050,9 +2081,11 @@ Al Habib Pharmacy Team`;
         cy2 = drawField("Inner Pack", p.inner_pack_size, 15 + colW, cy2);
         cy2 = drawField("Warehouse", p.primary_warehouse, 15 + colW, cy2);
         cy2 = drawField("Lead Time", p.lead_time, 15 + colW, cy2);
-
+        cy2 = drawField("Buyer", p.buyer, 15 + colW, cy2);
+        
         // Column 3
         let cy3 = yPos;
+        cy3 = drawField("Category Manager", p.category_manager, 15 + colW * 2, cy3);
         cy3 = drawField("Product Listing Fees", p.product_listing_fees, 15 + colW * 2, cy3);
         cy3 = drawField("Cost Price", `${p.currency || ''} ${p.price_cost || '0'}`, 15 + colW * 2, cy3);
         cy3 = drawField("Sales Price", `${p.currency || ''} ${p.price_retail || '0'}`, 15 + colW * 2, cy3);
@@ -2077,7 +2110,8 @@ Al Habib Pharmacy Team`;
         cy3 = drawField("Inv. Extra Disc", p.invoice_extra_discount, 15 + colW * 2, cy3);
         cy3 = drawField("Taxable", p.taxable ? 'Yes' : 'No', 15 + colW * 2, cy3);
         cy3 = drawField("Site Name", p.site_name, 15 + colW * 2, cy3);
-        cy3 = drawField("Site No", p.site_no, 15 + colW * 2, cy3);
+        cy3 = drawField("Min Order Qty", p.min_order_qty, 15 + colW * 2, cy3);
+        cy3 = drawField("Currency", p.currency || 'SAR', 15 + colW * 2, cy3);
 
         yPos = Math.max(cy1, cy2, cy3) + 8;
         
@@ -2628,10 +2662,14 @@ Al Habib Pharmacy Team`;
   const RequestDetails = () => {
     const isCorrection = (currentRequest?.status === 'vendor_revision_required' || currentRequest?.status === 'rejected') && activePortal === 'vendor';
     // Allow editing if it's a correction OR if we are at Step 7 (ERP) OR if it is Category Manager at Step 1 OR Super Admin
-    const isEditable = isCorrection || (isRequestActionable && currentRequest?.current_step === 7) || (isRequestActionable && (currentRequest?.current_step === 1 || currentUserEmployee?.role === 'super_admin'));
+    // Update: Allow Category Manager to edit ALWAYS if it is their category, regardless of step
+    const isCategoryManagerOwner = currentUserEmployee?.role === 'category_manager' && 
+        (assignedDivisions.some(d => d?.toLowerCase() === currentRequest?.category?.toLowerCase()) || 
+         delegatedDivisions.some(d => d?.toLowerCase() === currentRequest?.category?.toLowerCase()));
+
+    const isEditable = isCorrection || (isRequestActionable && currentRequest?.current_step === 7) || (isRequestActionable && currentRequest?.current_step === 1) || currentUserEmployee?.role === 'super_admin' || isCategoryManagerOwner;
     
     const [assignedManagerName, setAssignedManagerName] = useState<string | null>(null);
-    const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
     const [editableVendor, setEditableVendor] = useState<Partial<any>>({});
     const [isVendorModalOpen, setIsVendorModalOpen] = useState(false);
     const [uploadingState, setUploadingState] = useState<Record<string, boolean>>({});
@@ -2845,24 +2883,60 @@ Al Habib Pharmacy Team`;
         }
     };
 
+    const handleSaveChanges = async () => {
+        setIsSaving(true);
+        try {
+            // Update Vendor Details if changed
+            if (currentVendor?.id && Object.keys(editableVendor).length > 0) {
+                 await db.updateVendor(currentVendor.id, editableVendor);
+            }
+
+            // Update products only if we have them in editable state
+            if (editableProducts.length > 0) {
+                // Determine products to save - filter to only those belonging to current request if needed, 
+                // but editableProducts should already be scoped to current request.
+                for (const p of editableProducts) {
+                    const { id, ...rest } = p;
+                    // Remove calculated fields if any leaked in (though database service handles some)
+                    await db.updateProduct(id, rest); 
+                }
+            }
+            
+            // Reload Data
+            if (currentRequest?.id) {
+                const freshRequest = await db.fetchRequestById(currentRequest.id);
+                if (freshRequest) {
+                     setRequests(prev => prev.map(r => r.id === freshRequest.id ? freshRequest : r));
+                }
+                const p = await db.fetchProducts(currentRequest.id);
+                setProducts(p);
+                setEditableProducts(p); // Reset editable state to match DB
+            }
+            
+            if (activePortal === 'vendor' && currentVendor) {
+                 // Refresh vendor data if needed
+            }
+            
+            alert("Changes saved successfully!");
+        } catch (e) {
+            console.error(e);
+            alert("Failed to save changes");
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
     const renderEditableField = (label: string, field: keyof Product, p: Product, type = 'text', options?: string[]) => {
         const value = p[field];
-        if (isEditable) {
-             return (
-                 <EditableField 
-                    label={label}
-                    value={value}
-                    type={type}
-                    options={options}
-                    onChange={(newValue: any) => handleProductChange(p.id, field as string, newValue)}
-                 />
-             );
-        }
         return (
-            <div>
-                <p className="text-[#0F3D3E]/60 text-[9px] font-bold uppercase mb-1">{label}</p>
-                <p className="text-sm font-bold text-[#0F3D3E]">{value}</p>
-            </div>
+             <EditableField 
+                label={label}
+                value={value}
+                type={type}
+                options={options}
+                disabled={!isEditable}
+                onChange={(newValue: any) => handleProductChange(p.id, field as string, newValue)}
+             />
         );
     };
 
@@ -2916,6 +2990,12 @@ Al Habib Pharmacy Team`;
                 <Button onClick={handleResubmit} className="bg-amber-600 text-white hover:bg-amber-700 h-12 px-6 rounded-xl shadow-lg shadow-amber-600/20 flex items-center justify-center gap-2 transition-transform hover:scale-105 w-full sm:w-auto">
                    <Upload size={20} />
                    <span className="font-bold tracking-wide">Submit Corrections</span>
+                </Button>
+            )}
+            {isEditable && !isCorrection && (
+                <Button onClick={handleSaveChanges} disabled={isSaving} className="bg-blue-600 text-white hover:bg-blue-700 h-12 px-6 rounded-xl shadow-lg shadow-blue-600/20 flex items-center justify-center gap-2 transition-transform hover:scale-105 w-full sm:w-auto">
+                   {isSaving ? <span className="animate-spin text-xl">◌</span> : <Save size={20} />}
+                   <span className="font-bold tracking-wide">{isSaving ? 'Saving...' : 'Save Changes'}</span>
                 </Button>
             )}
             <Button onClick={generateRequestCSV} className="bg-emerald-600 text-white hover:bg-emerald-700 h-12 px-6 rounded-xl shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-2 transition-transform hover:scale-105 w-full sm:w-auto">
@@ -3018,11 +3098,13 @@ Al Habib Pharmacy Team`;
                       {/* Header Section */}
                       <div className="flex justify-between items-start mb-8 border-b border-gray-50 pb-6">
                         <div>
-                          <h4 className="font-serif font-bold text-3xl text-[#0F3D3E] leading-tight mb-2">{p.product_name}</h4>
-                          <p className="font-serif text-xl text-[#0F3D3E]/80 mt-1" dir="rtl">{p.product_name_ar}</p>
-                          <div className="flex items-center gap-3 mt-4">
-                             <span className="text-[10px] font-bold text-white bg-[#0F3D3E] px-3 py-1 rounded-md uppercase tracking-wider">{p.brand}</span>
+                          {/* Brand Name - Increased Size & Prominence */}
+                          <div className="mb-3">
+                             <span className="text-base font-black text-white bg-[#0F3D3E] px-4 py-1.5 rounded-lg uppercase tracking-widest shadow-sm">{p.brand}</span>
                           </div>
+                          {/* Product Name - Decreased Size */}
+                          <h4 className="font-serif font-bold text-xl text-[#0F3D3E] leading-tight mb-1">{p.product_name}</h4>
+                          <p className="font-serif text-base text-[#0F3D3E]/80 mt-1" dir="rtl">{p.product_name_ar}</p>
                         </div>
                         <div className="text-right">
                           <span className="text-2xl font-black text-[#0F3D3E] block">{p.currency} {p.price_retail}</span>
@@ -3038,62 +3120,57 @@ Al Habib Pharmacy Team`;
                         <div className="grid grid-cols-2 md:grid-cols-5 gap-4 bg-[#F0F4F4] p-6 rounded-2xl border border-gray-100">
                              {/* Division */}
                              <div>
-                                <p className="text-[10px] uppercase font-bold text-gray-400 mb-1">Division</p>
-                                {isEditable ? (
-                                    <EditableField 
-                                        value={p.division} 
-                                        onChange={(val: any) => handleProductChange(p.id, 'division', val)}
-                                        options={PRODUCT_HIERARCHY.map(d => d.name).filter(n => n !== "Grand Total")}
-                                    />
-                                ) : <p className="font-bold text-[#0F3D3E] text-xs break-words">{p.division}</p>}
+                                <p className="text-xs uppercase font-black text-[#C5A065] tracking-widest mb-2 shadow-sm">Division</p>
+                                <EditableField 
+                                    value={p.division} 
+                                    onChange={(val: any) => handleProductChange(p.id, 'division', val)}
+                                    options={PRODUCT_HIERARCHY.map(d => d.name).filter(n => n !== "Grand Total")}
+                                    disabled={!isEditable}
+                                />
                              </div>
 
                              {/* Department */}
                              <div>
-                                <p className="text-[10px] uppercase font-bold text-gray-400 mb-1">Department</p>
-                                {isEditable ? (
-                                    <EditableField 
-                                        value={p.department} 
-                                        onChange={(val: any) => handleProductChange(p.id, 'department', val)}
-                                        options={PRODUCT_HIERARCHY.find(d => d.name === p.division)?.children?.map(c => c.name) || []}
-                                    />
-                                ) : <p className="font-bold text-[#0F3D3E] text-xs break-words">{p.department}</p>}
+                                <p className="text-xs uppercase font-black text-[#C5A065] tracking-widest mb-2 shadow-sm">Department</p>
+                                <EditableField 
+                                    value={p.department} 
+                                    onChange={(val: any) => handleProductChange(p.id, 'department', val)}
+                                    options={PRODUCT_HIERARCHY.find(d => d.name === p.division)?.children?.map(c => c.name) || []}
+                                    disabled={!isEditable}
+                                />
                              </div>
 
                              {/* Category */}
                              <div>
-                                <p className="text-[10px] uppercase font-bold text-gray-400 mb-1">Category</p>
-                                {isEditable ? (
-                                    <EditableField 
-                                        value={p.category} 
-                                        onChange={(val: any) => handleProductChange(p.id, 'category', val)}
-                                        options={PRODUCT_HIERARCHY.find(d => d.name === p.division)?.children?.find(d => d.name === p.department)?.children?.map(c => c.name) || []}
-                                    />
-                                ) : <p className="font-bold text-[#0F3D3E] text-xs break-words">{p.category}</p>}
+                                <p className="text-xs uppercase font-black text-[#C5A065] tracking-widest mb-2 shadow-sm">Category</p>
+                                <EditableField 
+                                    value={p.category} 
+                                    onChange={(val: any) => handleProductChange(p.id, 'category', val)}
+                                    options={PRODUCT_HIERARCHY.find(d => d.name === p.division)?.children?.find(d => d.name === p.department)?.children?.map(c => c.name) || []}
+                                    disabled={!isEditable}
+                                />
                              </div>
 
                              {/* Sub Category */}
                              <div>
-                                <p className="text-[10px] uppercase font-bold text-gray-400 mb-1">Sub Category</p>
-                                {isEditable ? (
-                                    <EditableField 
-                                        value={p.sub_category} 
-                                        onChange={(val: any) => handleProductChange(p.id, 'sub_category', val)}
-                                        options={PRODUCT_HIERARCHY.find(d => d.name === p.division)?.children?.find(d => d.name === p.department)?.children?.find(c => c.name === p.category)?.children?.map(s => s.name) || []}
-                                    />
-                                ) : <p className="font-bold text-[#0F3D3E] text-xs break-words">{p.sub_category}</p>}
+                                <p className="text-xs uppercase font-black text-[#C5A065] tracking-widest mb-2 shadow-sm">Sub Category</p>
+                                <EditableField 
+                                    value={p.sub_category} 
+                                    onChange={(val: any) => handleProductChange(p.id, 'sub_category', val)}
+                                    options={PRODUCT_HIERARCHY.find(d => d.name === p.division)?.children?.find(d => d.name === p.department)?.children?.find(c => c.name === p.category)?.children?.map(s => s.name) || []}
+                                    disabled={!isEditable}
+                                />
                              </div>
 
                              {/* Class */}
                              <div>
-                                <p className="text-[10px] uppercase font-bold text-gray-400 mb-1">Class</p>
-                                {isEditable ? (
-                                    <EditableField 
-                                        value={p.class_name} 
-                                        onChange={(val: any) => handleProductChange(p.id, 'class_name', val)}
-                                        options={PRODUCT_HIERARCHY.find(d => d.name === p.division)?.children?.find(d => d.name === p.department)?.children?.find(c => c.name === p.category)?.children?.find(s => s.name === p.sub_category)?.children?.map(cl => cl.name) || []}
-                                    />
-                                ) : <p className="font-bold text-[#0F3D3E] text-xs break-words">{p.class_name}</p>}
+                                <p className="text-xs uppercase font-black text-[#C5A065] tracking-widest mb-2 shadow-sm">Class</p>
+                                <EditableField 
+                                    value={p.class_name} 
+                                    onChange={(val: any) => handleProductChange(p.id, 'class_name', val)}
+                                    options={PRODUCT_HIERARCHY.find(d => d.name === p.division)?.children?.find(d => d.name === p.department)?.children?.find(c => c.name === p.category)?.children?.find(s => s.name === p.sub_category)?.children?.map(cl => cl.name) || []}
+                                    disabled={!isEditable}
+                                />
                              </div>
                         </div>
                       </div>
@@ -3107,7 +3184,7 @@ Al Habib Pharmacy Team`;
                            
                            {/* Column 1: Basic Information */}
                            <div className="space-y-6 border-r border-gray-50 md:pr-6">
-                              <h6 className="text-[10px] font-black text-[#C5A065] uppercase tracking-[0.2em] mb-4 border-b border-gray-50 pb-2">Basic Information</h6>
+                              <h6 className="text-sm font-black text-[#C5A065] uppercase tracking-[0.2em] mb-4 border-b border-gray-50 pb-2">Basic Information</h6>
                               {renderEditableField('Brand Name', 'brand', p)}
                               {renderEditableField('English Description', 'product_name', p)}
                               {renderEditableField('Arabic Description', 'product_name_ar', p)}
@@ -3122,7 +3199,7 @@ Al Habib Pharmacy Team`;
 
                            {/* Column 2: Logistics & Supply */}
                            <div className="space-y-6 border-r border-gray-50 md:pr-6">
-                              <h6 className="text-[10px] font-black text-[#C5A065] uppercase tracking-[0.2em] mb-4 border-b border-gray-50 pb-2">Logistics & Supply</h6>
+                              <h6 className="text-sm font-black text-[#C5A065] uppercase tracking-[0.2em] mb-4 border-b border-gray-50 pb-2">Logistics & Supply</h6>
                               {renderEditableField('Purchasing Status', 'purchasing_status', p, 'text', ['In-Stock', 'Cross Docking', 'DSD'])}
                               {renderEditableField('Storage Condition', 'storage_condition', p, 'text', ['Room Temp (15-25C)', 'Chilled (2-8C)', 'Frozen (-18C)'])}
                               <div className="grid grid-cols-2 gap-4">
@@ -3130,22 +3207,24 @@ Al Habib Pharmacy Team`;
                                   {renderEditableField('UoM', 'uom', p, 'text', ['Each', 'Box', 'Carton', 'Bottle'])}
                               </div>
                               <div className="grid grid-cols-2 gap-4">
-                                  {isEditable ? (
-                                      <div className="w-full">
-                                         <p className="text-[#0F3D3E]/60 text-[9px] font-bold uppercase mb-1">Lot Tracked</p>
-                                         <Select options={['Yes', 'No']} value={p.lot_indicator ? 'Yes' : 'No'} onChange={e => handleProductChange(p.id, 'lot_indicator', e.target.value === 'Yes')} />
-                                      </div>
-                                  ) : (
-                                      <div><p className="text-[#0F3D3E]/60 text-[9px] font-bold uppercase mb-1">Lot Tracked</p><p className="text-sm font-bold text-[#0F3D3E]">{p.lot_indicator ? 'Yes' : 'No'}</p></div>
-                                  )}
-                                  {isEditable ? (
-                                      <div className="w-full">
-                                         <p className="text-[#0F3D3E]/60 text-[9px] font-bold uppercase mb-1">RTV Allowed</p>
-                                         <Select options={['Yes', 'No']} value={p.rtv_allowed ? 'Yes' : 'No'} onChange={e => handleProductChange(p.id, 'rtv_allowed', e.target.value === 'Yes')} />
-                                      </div>
-                                  ) : (
-                                      <div><p className="text-[#0F3D3E]/60 text-[9px] font-bold uppercase mb-1">RTV Allowed</p><p className="text-sm font-bold text-[#0F3D3E]">{p.rtv_allowed ? 'Yes' : 'No'}</p></div>
-                                  )}
+                                  <div className="w-full">
+                                      <p className="text-xs uppercase font-black text-[#0F3D3E] tracking-widest mb-1 shadow-sm">Lot Tracked</p>
+                                      <Select 
+                                          options={['Yes', 'No']} 
+                                          value={p.lot_indicator ? 'Yes' : 'No'} 
+                                          onChange={e => handleProductChange(p.id, 'lot_indicator', e.target.value === 'Yes')} 
+                                          disabled={!isEditable}
+                                      />
+                                  </div>
+                                  <div className="w-full">
+                                      <p className="text-xs uppercase font-black text-[#0F3D3E] tracking-widest mb-1 shadow-sm">RTV Allowed</p>
+                                      <Select 
+                                          options={['Yes', 'No']} 
+                                          value={p.rtv_allowed ? 'Yes' : 'No'} 
+                                          onChange={e => handleProductChange(p.id, 'rtv_allowed', e.target.value === 'Yes')} 
+                                          disabled={!isEditable}
+                                      />
+                                  </div>
                               </div>
                               <div className="grid grid-cols-2 gap-4">
                                   {renderEditableField('Case Count', 'case_count', p, 'number')}
@@ -3160,13 +3239,13 @@ Al Habib Pharmacy Team`;
 
                            {/* Column 3: Commercial Terms */}
                            <div className="space-y-6">
-                              <h6 className="text-[10px] font-black text-[#C5A065] uppercase tracking-[0.2em] mb-4 border-b border-gray-50 pb-2">Commercial Terms</h6>
+                              <h6 className="text-sm font-black text-[#C5A065] uppercase tracking-[0.2em] mb-4 border-b border-gray-50 pb-2">Commercial Terms</h6>
                               <div className="grid grid-cols-2 gap-4">
                                   {renderEditableField('Cost Price', 'price_cost', p, 'number')}
                                   {renderEditableField('Sales Price', 'price_retail', p, 'number')}
                               </div>
                               <div className="bg-[#F0F4F4] p-3 rounded-lg border border-gray-100">
-                                   <p className="text-[#0F3D3E]/60 text-[9px] font-bold uppercase mb-1">Estimated Margin</p>
+                                   <p className="text-[#0F3D3E] text-xs font-bold uppercase mb-1">Estimated Margin</p>
                                    <p className="text-xl font-black text-[#0F3D3E]">
                                        {(p.price_cost && p.price_retail && Number(p.price_retail) > 0) 
                                            ? ((1 - (Number(p.price_cost) / Number(p.price_retail))) * 100).toFixed(2) + '%' 
@@ -3175,14 +3254,15 @@ Al Habib Pharmacy Team`;
                               </div>
                               {renderEditableField('Currency', 'currency', p, 'text', ['SAR', 'USD', 'EUR'])}
                               {renderEditableField('Product Listing Fees', 'product_listing_fees', p)}
-                              {isEditable ? (
-                                  <div className="w-full">
-                                     <p className="text-[#0F3D3E]/60 text-[9px] font-bold uppercase mb-1">Taxable</p>
-                                     <Select options={['Yes', 'No']} value={p.taxable ? 'Yes' : 'No'} onChange={e => handleProductChange(p.id, 'taxable', e.target.value === 'Yes')} />
-                                  </div>
-                              ) : (
-                                  <div><p className="text-[#0F3D3E]/60 text-[9px] font-bold uppercase mb-1">Taxable</p><p className="text-sm font-bold text-[#0F3D3E]">{p.taxable ? 'Yes' : 'No'}</p></div>
-                              )}
+                              <div className="w-full">
+                                  <p className="text-xs uppercase font-black text-[#0F3D3E] tracking-widest mb-1 shadow-sm">Taxable</p>
+                                  <Select 
+                                      options={['Yes', 'No']} 
+                                      value={p.taxable ? 'Yes' : 'No'} 
+                                      onChange={e => handleProductChange(p.id, 'taxable', e.target.value === 'Yes')} 
+                                      disabled={!isEditable}
+                                  />
+                              </div>
                               <div className="grid grid-cols-2 gap-4">
                                   {renderEditableField('MOH Disc %', 'moh_discount_percentage', p, 'number')}
                                   {renderEditableField('Extra Disc %', 'invoice_extra_discount', p, 'number')}
