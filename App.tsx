@@ -4016,7 +4016,7 @@ Al Habib Pharmacy Team`;
                     <Input className="!py-3 !text-xs" label="Email" type="email" value={authForm.email} onChange={e => setAuthForm({...authForm, email: e.target.value})} required />
                     <Input className="!py-3 !text-xs" label="Password" type="password" value={authForm.password} onChange={e => setAuthForm({...authForm, password: e.target.value})} placeholder="••••••••" required />
                 </div>
-                <Button type="submit" disabled={isSigningIn} className={`w-full h-14 text-sm rounded-xl bg-[#0F3D3E] hover:bg-[#0F3D3E]/90 shadow-xl text-white border-none mt-4 transition-all duration-500 relative overflow-hidden group disabled:opacity-100 ${isSigningIn ? 'rotate-180 cursor-default pointer-events-none' : 'hover:scale-[1.02] active:scale-[0.98]'}`}>
+                <Button type="submit" disabled={isSigningIn} className={`w-full h-14 text-sm rounded-xl bg-[#0F3D3E] hover:bg-[#0F3D3E]/90 shadow-xl text-white border-none mt-4 transition-all duration-500 relative overflow-hidden group !disabled:opacity-100 disabled:!opacity-100 ${isSigningIn ? 'rotate-180 cursor-default pointer-events-none' : 'hover:scale-[1.02] active:scale-[0.98]'}`}>
                     <div className={`absolute inset-0 flex items-center justify-center gap-2 transition-opacity duration-300 ${isSigningIn ? 'opacity-0' : 'opacity-100'}`}>
                         <span className="inline-block transition-transform duration-500 font-bold uppercase tracking-wider text-[10px] md:text-xs">
                             {authMode === 'login' ? 'Access Vendor Portal' : 'Create Account'}
@@ -4081,7 +4081,7 @@ Al Habib Pharmacy Team`;
                      <Input className="!py-3 !text-xs" label="Password" type="password" value={authForm.password} onChange={e => setAuthForm({...authForm, password: e.target.value})} placeholder="••••••••" required />
                  </div>
 
-                 <Button type="submit" disabled={isSigningIn} className={`w-full h-14 text-sm rounded-xl bg-[#0F3D3E] hover:bg-[#0F3D3E]/90 shadow-xl text-white border-none mt-4 transition-all duration-500 relative overflow-hidden group disabled:opacity-100 ${isSigningIn ? 'rotate-180 cursor-default pointer-events-none' : 'hover:scale-[1.02] active:scale-[0.98]'}`}>
+                 <Button type="submit" disabled={isSigningIn} className={`w-full h-14 text-sm rounded-xl bg-[#0F3D3E] hover:bg-[#0F3D3E]/90 shadow-xl text-white border-none mt-4 transition-all duration-500 relative overflow-hidden group !disabled:opacity-100 disabled:!opacity-100 ${isSigningIn ? 'rotate-180 cursor-default pointer-events-none' : 'hover:scale-[1.02] active:scale-[0.98]'}`}>
                     <div className={`absolute inset-0 flex items-center justify-center gap-2 transition-opacity duration-300 ${isSigningIn ? 'opacity-0' : 'opacity-100'}`}>
                         <span className="inline-block transition-transform duration-500 font-bold uppercase tracking-wider text-[10px] md:text-xs">
                             Sign In Securely
