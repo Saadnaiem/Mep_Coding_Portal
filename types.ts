@@ -1,7 +1,7 @@
 
 export type UserType = 'vendor' | 'employee' | 'admin';
 export type RequestType = 'new_vendor' | 'new_products';
-export type RequestStatus = 'draft' | 'submitted' | 'in_review' | 'vendor_revision_required' | 'rejected' | 'approved_pending_erp' | 'completed';
+export type RequestStatus = 'draft' | 'submitted' | 'in_review' | 'vendor_revision_required' | 'rejected' | 'approved_pending_erp' | 'completed' | 'partially_approved';
 export type RequestPriority = 'normal' | 'urgent';
 export type EmployeeRole = 
   | 'category_manager' 
@@ -169,6 +169,9 @@ export interface Product {
   item_sub_group?: string;
   taxable?: boolean;
   margin?: number;
+  // Product Approval Status
+  status?: 'pending' | 'approved' | 'rejected' | 'revision_required';
+  rejection_reason?: string;
   // New Fees
   product_listing_fees?: string;
 

@@ -43,6 +43,8 @@ import {
   Layers,
   Download,
   Briefcase,
+  RotateCcw,
+  XCircle,
   Image as ImageIcon
 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -119,11 +121,11 @@ const SidebarItem: React.FC<{
       w-full flex items-center gap-4 px-5 py-4 rounded-xl transition-all duration-300 group
       ${active 
         ? 'bg-[#0F3D3E] text-white shadow-lg shadow-[#0F3D3E]/20' 
-        : 'text-gray-500 hover:bg-[#F0F4F4] hover:text-[#0F3D3E]'}
+        : 'text-[#0F3D3E]/70 hover:bg-[#F0F4F4] hover:text-[#0F3D3E]'}
       ${collapsed ? 'justify-center px-0' : ''}
     `}
   >
-    <Icon size={20} className={`transition-colors duration-300 ${active ? 'text-[#C5A065]' : 'text-gray-400 group-hover:text-[#C5A065]'}`} />
+    <Icon size={20} className={`transition-colors duration-300 ${active ? 'text-[#C5A065]' : 'text-[#C5A065]/60 group-hover:text-[#C5A065]'}`} />
     {!collapsed && (
       <span className={`text-sm font-bold tracking-wide whitespace-nowrap overflow-hidden font-serif ${active ? 'text-white' : ''}`}>
         {label}
@@ -131,6 +133,45 @@ const SidebarItem: React.FC<{
     )}
   </button>
 );
+
+
+// --- Helper Components to Prevent Focus Loss ---
+const SafeTextArea = ({ value, onChange, onBlur, disabled, placeholder, className }: any) => {
+    const [localValue, setLocalValue] = useState(value || '');
+    useEffect(() => { setLocalValue(value || ''); }, [value]);
+
+    return (
+        <textarea 
+            className={className}
+            placeholder={placeholder}
+            value={localValue}
+            onChange={(e) => {
+                setLocalValue(e.target.value);
+                onChange(e);
+            }}
+            onBlur={onBlur}
+            disabled={disabled}
+        />
+    );
+};
+
+const SafeInput = ({ value, onChange, type = 'text', placeholder, className }: any) => {
+    const [localValue, setLocalValue] = useState(value || '');
+    useEffect(() => { setLocalValue(value || ''); }, [value]);
+
+    return (
+        <input 
+            type={type}
+            placeholder={placeholder}
+            value={localValue}
+            onChange={(e) => {
+                setLocalValue(e.target.value);
+                onChange(e);
+            }}
+            className={className}
+        />
+    );
+};
 
 const App: React.FC = () => {
   const location = useLocation();
@@ -358,6 +399,54 @@ const App: React.FC = () => {
   
   // Shared Editable State for Products (used by RequestDetails and Actions)
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
+  const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
+  const [selectActionType, setSelectActionType] = useState<'approve' | 'reject' | 'revision_required' | null>(null);
+  // Using ref for bulk comment to improve performance and prevent focus loss during typing
+  const bulkCommentRef = React.useRef('');
+  
+  // Selection Handlers
+  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+      // Use products or editableProducts depending on view
+      const targetList = (isEditable && editableProducts.length > 0) ? editableProducts : products;
+      if (e.target.checked) {
+          setSelectedProductIds(targetList.map(p => p.id));
+      } else {
+          setSelectedProductIds([]);
+      }
+  };
+
+  const handleCheckboxChange = (id: string, checked: boolean) => {
+      if (checked) {
+          setSelectedProductIds(prev => [...prev, id]);
+      } else {
+          setSelectedProductIds(prev => prev.filter(pId => pId !== id));
+      }
+  };
+
+  const applyBulkStatus = async (status: 'approved' | 'rejected' | 'revision_required', comment?: string) => {
+      if (selectedProductIds.length === 0) return;
+      
+      const updates = selectedProductIds.map(id => 
+          db.updateProduct(id, { 
+              status: status, 
+              rejection_reason: comment || ''
+          })
+      );
+      
+      await Promise.all(updates);
+      
+      // Refresh local state
+      const updatedProducts = products.map(p => 
+          selectedProductIds.includes(p.id) 
+              ? { ...p, status: status, rejection_reason: comment || '' } 
+              : p
+      );
+      setProducts(updatedProducts);
+      setSelectedProductIds([]); // Clear selection
+      setSelectActionType(null);
+      if (bulkCommentRef.current) bulkCommentRef.current = ''; // Clear ref
+  };
+
   const [editableProducts, setEditableProducts] = useState<Product[]>([]);
   
   const handleAddProduct = (newProduct: Product) => {
@@ -420,6 +509,17 @@ const App: React.FC = () => {
     
     return true;
   }, [activePortal, currentRequest, currentUserEmployee, currentUserProfile, assignedDivisions, activeDelegations, delegatedDivisions]);
+
+  // Derived State moved up for access
+  const isCorrection = (currentRequest?.status === 'vendor_revision_required' || currentRequest?.status === 'rejected') && activePortal === 'vendor';
+  const isCategoryManagerOwner = useMemo(() => {
+        if (currentUserEmployee?.role !== 'category_manager') return false;
+        // Basic check, might need assignedDivisions if available in scope
+        return true; 
+  }, [currentUserEmployee, currentRequest]);
+
+  const isEditable = isCorrection || (isRequestActionable && currentRequest?.current_step === 7) || (isRequestActionable && currentRequest?.current_step === 1) || currentUserEmployee?.role === 'super_admin' || isCategoryManagerOwner;
+
 
   const canViewHistory = useMemo(() => {
     // Both vendors and employees should see history
@@ -721,9 +821,9 @@ const App: React.FC = () => {
     let nextStatus: RequestStatus = currentRequest.status;
 
     if (actionType === 'approve') {
-      // Logic for Saving Product Changes - If user edited anything (e.g. Category Manager filling fees, or ERP filling codes)
+      // Logic for Saving Product Changes - If user edited anything
       // This ensures any changes made by the approver are persisted permanently before moving to next step
-      if (editableProducts.length > 0) {
+      if (isEditable && editableProducts.length > 0) {
           try {
              for (const p of editableProducts) {
                  const { id, ...rest } = p;
@@ -735,12 +835,37 @@ const App: React.FC = () => {
           }
       }
 
-      if (currentRequest.current_step === MOCK_STEPS.length) { 
-        nextStatus = 'completed'; 
-      } else { 
-        nextStep += 1; 
-        nextStatus = 'in_review'; 
-      }
+        if (currentRequest.current_step === MOCK_STEPS.length) { 
+            // --- FINAL APPROVAL LOGIC ---
+            // Determine if Partially Approved or Completed
+            // Fetch latest status of products from 'products' state which should be updated by the actions
+            const currentProductStatuses = products.filter(p => p.request_id === currentRequest.id);
+            const allApproved = currentProductStatuses.every(p => p.status === 'approved');
+            const hasRejections = currentProductStatuses.some(p => p.status === 'rejected');
+            
+            if (hasRejections && (currentProductStatuses.some(p => p.status === 'approved'))) {
+                 nextStatus = 'partially_approved';
+            } else if (allApproved) {
+                 nextStatus = 'completed';
+            } else if (currentProductStatuses.every(p => p.status === 'rejected')) {
+                 nextStatus = 'rejected';
+            } else {
+                 // Fallback
+                 nextStatus = 'completed';
+            }
+
+        } else { 
+            // --- INTERMEDIATE STEP LOGIC ---
+            nextStep += 1; 
+            nextStatus = 'in_review'; 
+            
+            // REQ: "status of product to be still pending til has fully approval from all approver"
+            // Reset 'approved' products to 'pending' in the DB so next approver sees them as pending
+            const productsToReset = products.filter(p => p.status === 'approved' && p.request_id === currentRequest.id);
+            
+            // We use Promise.all to ensure updates happen in parallel
+            await Promise.all(productsToReset.map(p => db.updateProduct(p.id, { status: 'pending' })));
+        }
     } else if (actionType === 'reject') { nextStatus = 'rejected'; }
     else if (actionType === 'return') { nextStatus = 'vendor_revision_required'; }
 
@@ -1616,13 +1741,13 @@ Al Habib Pharmacy Team`;
             `${p.currency || ''} ${Number(p.price_cost || 0).toFixed(2)}`,
             `${p.currency || ''} ${Number(p.price_retail || 0).toFixed(2)}`,
             margin,
-            p.taxable ? 'Yes' : 'No'
+            (currentRequest?.status === 'rejected') ? 'Rejected' : ((currentRequest?.status === 'completed' || currentRequest?.status === 'approved_pending_erp') ? 'Approved' : 'Pending')
         ];
     });
 
     autoTable(doc, {
         startY: 40,
-        head: [['Brand', 'Product Name', 'Cost Price', 'Selling Price', 'Margin', 'Taxable']],
+        head: [['Brand', 'Product Name', 'Cost Price', 'Selling Price', 'Margin', 'Status']],
         body: productSummaryBody,
         theme: 'grid',
         headStyles: { 
@@ -1646,7 +1771,7 @@ Al Habib Pharmacy Team`;
             2: { halign: 'right', cellWidth: 30, fontStyle: 'bold', textColor: [225, 29, 72] }, // Cost Price
             3: { halign: 'right', cellWidth: 32, fontStyle: 'bold', textColor: [5, 150, 105] }, // Selling Price
             4: { halign: 'center', cellWidth: 22, fontStyle: 'bold', textColor: [37, 99, 235] }, // Margin
-            5: { halign: 'center', cellWidth: 20 } // Taxable
+            5: { halign: 'center', cellWidth: 20 } // Status
         }
     });
 
@@ -2108,7 +2233,10 @@ Al Habib Pharmacy Team`;
 
         cy3 = drawField("MOH Disc %", p.moh_discount_percentage, 15 + colW * 2, cy3);
         cy3 = drawField("Inv. Extra Disc", p.invoice_extra_discount, 15 + colW * 2, cy3);
-        cy3 = drawField("Taxable", p.taxable ? 'Yes' : 'No', 15 + colW * 2, cy3);
+        const status = (currentRequest?.status === 'rejected') ? 'Rejected' 
+            : ((currentRequest?.status === 'completed' || currentRequest?.status === 'approved_pending_erp') ? 'Approved' 
+            : 'Pending');
+        cy3 = drawField("Status", status, 15 + colW * 2, cy3);
         cy3 = drawField("Site Name", p.site_name, 15 + colW * 2, cy3);
         cy3 = drawField("Min Order Qty", p.min_order_qty, 15 + colW * 2, cy3);
         cy3 = drawField("Currency", p.currency || 'SAR', 15 + colW * 2, cy3);
@@ -2271,10 +2399,19 @@ Al Habib Pharmacy Team`;
                 const p1Height = (logoImg.height * p1Width) / logoImg.width;
                 doc.addImage(logoImg, 'PNG', (currentW - p1Width) / 2, 5, p1Width, p1Height);
             } else {
-                // Page 2+: Top Right - Standard Size
-                const targetWidth = 40; 
-                const targetHeight = (logoImg.height * targetWidth) / logoImg.width;
-                doc.addImage(logoImg, 'PNG', currentW - targetWidth - 10, 5, targetWidth, targetHeight);
+                 // Page 2+: Top Right - Smaller to fit in white header space (0-15mm)
+                 const maxHeight = 10;
+                 let targetWidth = 40; 
+                 let targetHeight = (logoImg.height * targetWidth) / logoImg.width;
+                 
+                 // Constrain height if needed
+                 if (targetHeight > maxHeight) {
+                     targetHeight = maxHeight;
+                     targetWidth = (logoImg.width * targetHeight) / logoImg.height;
+                 }
+                 
+                 // Position right-aligned in white space above header
+                 doc.addImage(logoImg, 'PNG', currentW - targetWidth - 10, 2, targetWidth, targetHeight);
             }
         }
 
@@ -2382,7 +2519,7 @@ Al Habib Pharmacy Team`;
              <header className="flex justify-between items-center">
                  <div>
                     <h1 className="text-3xl font-black font-serif text-[#0F3D3E]">Company Profile</h1>
-                    <p className="text-gray-500 mt-2">Manage your company details and compliance documents.</p>
+                    <p className="text-[#0F3D3E]/60 mt-2">Manage your company details and compliance details.</p>
                  </div>
                  <Button 
                    className="h-12 px-8 rounded-xl bg-[#0F3D3E] text-white shadow-lg shadow-[#0F3D3E]/20 hover:scale-105 transition-all"
@@ -2428,36 +2565,36 @@ Al Habib Pharmacy Team`;
       <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm space-y-4 sticky top-20 md:top-60 z-20">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
              <div className="md:col-span-1">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1 block">Search</label>
+                <label className="text-[10px] font-bold text-[#0F3D3E] uppercase tracking-wider mb-1 block opacity-80">Search</label>
                 <div className="relative">
-                    <Search className="absolute left-3 top-2.5 text-gray-400" size={16} />
+                    <Search className="absolute left-3 top-2.5 text-[#C5A065]" size={16} />
                     <input 
                         type="text" 
                         placeholder="Search all columns..." 
-                        className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:border-[#C5A065] focus:outline-none"
+                        className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:border-[#C5A065] focus:outline-none text-[#0F3D3E] placeholder:text-[#0F3D3E]/30"
                         value={searchQuery}
                         onChange={e => setSearchQuery(e.target.value)}
                     />
                 </div>
              </div>
              <div>
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1 block">Date Range</label>
+                <label className="text-[10px] font-bold text-[#0F3D3E] uppercase tracking-wider mb-1 block opacity-80">Date Range</label>
                 <div className="flex gap-2">
-                    <input type="date" className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg text-xs" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
-                    <input type="date" className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg text-xs" value={dateTo} onChange={e => setDateTo(e.target.value)} />
+                    <input type="date" className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg text-xs text-[#0F3D3E]" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
+                    <input type="date" className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg text-xs text-[#0F3D3E]" value={dateTo} onChange={e => setDateTo(e.target.value)} />
                 </div>
              </div>
              <div>
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1 block">Category</label>
-                <select className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg text-sm" value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)}>
+                <label className="text-[10px] font-bold text-[#0F3D3E] uppercase tracking-wider mb-1 block opacity-80">Category</label>
+                <select className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-[#0F3D3E]" value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)}>
                     <option value="all">All Categories</option>
                     {uniqueCategories.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
              </div>
              <div>
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1 block">Details</label>
+                <label className="text-[10px] font-bold text-[#0F3D3E] uppercase tracking-wider mb-1 block opacity-80">Details</label>
                  <div className="grid grid-cols-2 gap-2">
-                    <select className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg text-sm" value={statusFilter} onChange={e => setStatusFilter(e.target.value as any)}>
+                    <select className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-[#0F3D3E]" value={statusFilter} onChange={e => setStatusFilter(e.target.value as any)}>
                         <option value="all">All Status</option>
                         <option value="draft">Draft</option>
                         <option value="in_review">In Review</option>
@@ -2465,7 +2602,7 @@ Al Habib Pharmacy Team`;
                         <option value="rejected">Rejected</option>
                         <option value="vendor_revision_required">Revision</option>
                     </select>
-                     <select className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg text-sm" value={vendorFilter} onChange={e => setVendorFilter(e.target.value)}>
+                     <select className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-[#0F3D3E]" value={vendorFilter} onChange={e => setVendorFilter(e.target.value)}>
                         <option value="all">All Partners</option>
                         {uniqueVendors.map(v => <option key={v} value={v}>{v}</option>)}
                     </select>
@@ -2485,7 +2622,7 @@ Al Habib Pharmacy Team`;
         {/* Mobile View: Cards */}
         <div className="md:hidden flex flex-col divide-y divide-gray-100">
             {displayRequests.length === 0 ? (
-                <div className="py-12 text-center text-gray-400 font-medium italic">No requests found.</div>
+                <div className="py-12 text-center text-[#0F3D3E]/40 font-medium italic">No requests found.</div>
             ) : (
                 displayRequests.map(req => (
                     <div key={req.id} className="p-4 hover:bg-[#F0F4F4]/50 active:bg-[#F0F4F4] transition-colors cursor-pointer" onClick={() => { setSelectedRequestId(req.id); setView('request_details'); }}>
@@ -2493,16 +2630,42 @@ Al Habib Pharmacy Team`;
                              <div>
                                  <div className="flex items-center gap-2">
                                     <p className="font-bold text-[#0F3D3E] font-serif text-base">{req.request_number}</p>
-                                    <span className="text-[9px] font-bold bg-[#F0F4F4] text-[#0F3D3E] px-2 py-0.5 rounded border border-gray-200 whitespace-nowrap">{req.category}</span>
+                                    <span className={`text-[9px] font-bold px-2 py-0.5 rounded border whitespace-nowrap ${
+                                        (req.category || '').toLowerCase().includes('mom') ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                                        (req.category || '').toLowerCase().includes('personal') ? 'bg-orange-50 text-orange-700 border-orange-200' :
+                                        (req.category || '').toLowerCase().includes('wellness') ? 'bg-green-50 text-green-700 border-green-200' :
+                                        (req.category || '').toLowerCase().includes('beauty') ? 'bg-pink-50 text-pink-700 border-pink-200' :
+                                        'bg-[#F0F4F4] text-[#0F3D3E] border-gray-200'
+                                    }`}>
+                                        {req.category}
+                                    </span>
                                  </div>
-                                 <p className="text-xs text-gray-500 font-medium mt-1 line-clamp-1">{req.vendor?.company_name}</p>
+                                 <p className="text-xs text-[#0F3D3E]/70 font-medium mt-1 line-clamp-1">{req.vendor?.company_name}</p>
                              </div>
                         </div>
                         
                         <div className="flex justify-between items-end">
-                             <div className="flex flex-col gap-2">
+                             <div className="flex flex-col gap-2 items-start">
+                                  <span className={`
+                                    px-4 py-1.5 text-[10px] font-serif font-bold uppercase tracking-widest rounded-full border shadow-sm
+                                    ${req.status === 'completed' || req.status === 'approved_pending_erp'
+                                        ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
+                                        : req.status === 'rejected' 
+                                            ? 'bg-red-50 text-red-800 border-red-600'
+                                            : req.status === 'partially_approved'
+                                                ? 'bg-emerald-50 text-[#0F3D3E] border-gray-300'
+                                                : 'bg-amber-50 text-amber-800 border-amber-600'
+                                    }
+                                  `}>
+                                    Overall: {req.status === 'completed' || req.status === 'approved_pending_erp' ? 'Approved' : req.status === 'rejected' ? 'Rejected' : req.status === 'partially_approved' ? 'Partially Approved' : 'Pending'}
+                                  </span>
                                   <Badge status={req.status} currentStep={req.current_step} labelSuffix={req.status === 'in_review' ? "Waiting Approval from " + MOCK_STEPS.find(s => s.step_number === req.current_step)?.step_name.replace(/ Approval$/i, '').replace(/ Issuance$/i, '') : undefined} />
-                                 <span className="text-[10px] text-gray-400 font-bold tracking-wider">{formatKSA(req.created_at)}</span>
+                                  {req.status === 'completed' && (
+                                    <span className="text-[10px] text-emerald-600 font-black uppercase tracking-wide">
+                                        ERP Code has been created
+                                    </span>
+                                  )}
+                                 <span className="text-[10px] text-[#0F3D3E]/60 font-bold tracking-wider">{formatKSA(req.created_at)}</span>
                              </div>
                              <div className="h-8 w-8 flex items-center justify-center rounded-full bg-[#C5A065]/10 text-[#C5A065]">
                                  <ChevronRight size={16} strokeWidth={3} />
@@ -2517,25 +2680,68 @@ Al Habib Pharmacy Team`;
         <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left">
             <thead>
-              <tr className="bg-[#Fdfbf7] border-b border-gray-100">
-                <th className="py-5 px-8 text-[11px] font-serif font-bold text-[#0F3D3E] uppercase tracking-widest opacity-70">Request ID</th>
-                <th className="py-5 px-8 text-[11px] font-serif font-bold text-[#0F3D3E] uppercase tracking-widest opacity-70">Partner</th>
-                <th className="py-5 px-8 text-[11px] font-serif font-bold text-[#0F3D3E] uppercase tracking-widest opacity-70">Category</th>
-                <th className="py-5 px-8 text-[11px] font-serif font-bold text-[#0F3D3E] uppercase tracking-widest opacity-70">Status</th>
-                <th className="py-5 px-8 text-[11px] font-serif font-bold text-[#0F3D3E] uppercase tracking-widest opacity-70">Submitted</th>
-                <th className="py-5 px-8 text-[11px] font-serif font-bold text-[#0F3D3E] uppercase tracking-widest opacity-70 text-right">Audit</th>
+              <tr className="bg-[#0F3D3E] border-b border-[#0F3D3E]">
+                <th className="py-5 px-8 text-[11px] font-serif font-bold text-white uppercase tracking-widest">Request ID</th>
+                <th className="py-5 px-8 text-[11px] font-serif font-bold text-white uppercase tracking-widest">Partner</th>
+                <th className="py-5 px-8 text-[11px] font-serif font-bold text-white uppercase tracking-widest">Category</th>
+                <th className="py-5 px-8 text-[11px] font-serif font-bold text-white uppercase tracking-widest">Status</th>
+                <th className="py-5 px-8 text-[11px] font-serif font-bold text-white uppercase tracking-widest">Submitted</th>
+                <th className="py-5 px-8 text-[11px] font-serif font-bold text-white uppercase tracking-widest text-right">Audit</th>
               </tr>
             </thead>
             <tbody>
               {displayRequests.length === 0 ? (
-                <tr><td colSpan={6} className="py-12 text-center text-gray-400 font-medium italic">No requests found.</td></tr>
+                <tr><td colSpan={6} className="py-12 text-center text-[#0F3D3E]/40 font-medium italic">No requests found.</td></tr>
               ) : (
                 displayRequests.map(req => (
                 <tr key={req.id} className="border-b border-gray-50 hover:bg-[#F0F4F4]/50 transition-colors duration-200">
                   <td className="py-6 px-8 font-bold text-[#0F3D3E] font-serif">{req.request_number}</td>
-                  <td className="py-6 px-8 text-sm font-medium text-gray-600">{req.vendor?.company_name}</td>
-                  <td className="py-6 px-8"><span className="text-[10px] font-bold bg-[#F0F4F4] text-[#0F3D3E] px-3 py-1.5 rounded-lg tracking-wide border border-transparent whitespace-nowrap">{req.category}</span></td>
-                  <td className="py-6 px-8"><Badge status={req.status} currentStep={req.current_step} labelSuffix={req.status === 'in_review' ? "Waiting Approval from " + MOCK_STEPS.find(s => s.step_number === req.current_step)?.step_name.replace(/ Approval$/i, '').replace(/ Issuance$/i, '') : undefined} /></td>
+                  <td className="py-6 px-8 text-sm font-medium text-[#0F3D3E]/80">{req.vendor?.company_name}</td>
+                  <td className="py-6 px-8">
+                      <span className={`text-[10px] font-bold px-3 py-1.5 rounded-lg tracking-wide border whitespace-nowrap ${
+                          (req.category || '').toLowerCase().includes('mom') ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                          (req.category || '').toLowerCase().includes('personal') ? 'bg-orange-50 text-orange-700 border-orange-200' :
+                          (req.category || '').toLowerCase().includes('wellness') ? 'bg-green-50 text-green-700 border-green-200' :
+                          (req.category || '').toLowerCase().includes('beauty') ? 'bg-pink-50 text-pink-700 border-pink-200' :
+                          'bg-[#F0F4F4] text-[#0F3D3E] border-transparent'
+                      }`}>
+                          {req.category}
+                      </span>
+                  </td>
+                  <td className="py-6 px-8">
+                      <div className="flex flex-row items-center justify-between gap-4">
+                        <div className="flex flex-col gap-1.5 items-start">
+                            <Badge status={req.status === 'submitted' ? 'in_review' : req.status} currentStep={req.status === 'submitted' ? 1 : req.current_step} />
+                            {(req.status === 'in_review' || req.status === 'submitted') && (
+                                <span className="text-[10px] text-amber-600 font-black uppercase tracking-wide">
+                                    Waiting: {req.status === 'submitted' ? 'Category Manager' : MOCK_STEPS.find(s => s.step_number === req.current_step)?.step_name.replace(/ Approval$/i, '').replace(/ Issuance$/i, '')}
+                                </span>
+                            )}
+                            {req.status === 'completed' && (
+                                <span className="text-[10px] text-emerald-600 font-black uppercase tracking-wide">
+                                    ERP Code has been created
+                                </span>
+                            )}
+                        </div>
+
+                        <span className={`
+                            px-4 py-1.5 text-[10px] font-serif font-bold uppercase tracking-widest rounded-full border shadow-sm
+                            ${(req.status === 'completed' || req.status === 'approved_pending_erp')
+                                ? 'bg-emerald-50 text-emerald-800 border-emerald-200 shadow-emerald-900/10' 
+                                : req.status === 'rejected' 
+                                    ? 'bg-red-50 text-red-800 border-red-600 shadow-red-900/10'
+                                    : req.status === 'partially_approved'
+                                        ? 'bg-gradient-to-r from-emerald-50 to-red-50 text-[#0F3D3E] border-gray-300'
+                                        : 'bg-amber-50 text-amber-800 border-amber-600 shadow-amber-900/10'
+                            }
+                        `}>
+                            {req.status === 'completed' || req.status === 'approved_pending_erp' ? 'Approved' : 
+                             req.status === 'rejected' ? 'Rejected' : 
+                             req.status === 'partially_approved' ? 'Partially Approved' : 
+                             'Pending'}
+                        </span>
+                      </div>
+                  </td>
                   <td className="py-6 px-8 text-xs font-bold text-[#0F3D3E]/70">{formatKSA(req.created_at)}</td>
                   <td className="py-6 px-8 text-right"><Button variant="ghost" className="hover:bg-[#C5A065]/10 hover:text-[#C5A065]" onClick={() => { setSelectedRequestId(req.id); setView('request_details'); }}><ChevronRight size={24} className="text-[#C5A065]" strokeWidth={3} /></Button></td>
                 </tr>
@@ -2642,7 +2848,7 @@ Al Habib Pharmacy Team`;
                         <p className="text-[10px] text-[#0F3D3E]/70 font-bold uppercase tracking-wider">{p.division} &gt; {p.class_name} | GTIN: {p.barcode}</p>
                      </div>
                   </div>
-                  <button onClick={() => setNewReqProducts(newReqProducts.filter((_, idx) => idx !== i))} className="p-3 text-gray-300 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"><Trash2 size={18} /></button>
+                  <button onClick={() => setNewReqProducts(newReqProducts.filter((_, idx) => idx !== i))} className="p-3 text-[#0F3D3E]/30 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"><Trash2 size={18} /></button>
                 </div>
               ))}
               {newReqProducts.length === 0 && <div className="py-16 text-center opacity-40"><Layers size={56} className="mx-auto mb-6 text-[#0F3D3E]" /><p className="text-xs font-bold uppercase tracking-widest text-[#0F3D3E]">No products listed in manifest yet.</p></div>}
@@ -2650,7 +2856,7 @@ Al Habib Pharmacy Team`;
           </Card>
 
           <div className="flex justify-between items-center bg-white p-6 rounded-3xl shadow-lg border border-gray-100">
-            <Button variant="outline" className="h-12 px-10 rounded-xl border-gray-200 text-gray-500 hover:text-[#0F3D3E] hover:border-[#0F3D3E]" onClick={() => setWizardStep(needsRegistration ? 2 : 1)}><ArrowLeft size={18} strokeWidth={3} /> Back</Button>
+            <Button variant="outline" className="h-12 px-10 rounded-xl border-gray-200 text-[#0F3D3E]/60 hover:text-[#0F3D3E] hover:border-[#0F3D3E]" onClick={() => setWizardStep(needsRegistration ? 2 : 1)}><ArrowLeft size={18} strokeWidth={3} /> Back</Button>
             <Button className="h-14 px-16 rounded-xl bg-[#0F3D3E] text-white hover:bg-[#0F3D3E]/90 shadow-lg shadow-[#0F3D3E]/20" onClick={handleCreateRequest} disabled={newReqProducts.length === 0}>Submit Request <ArrowRight size={20} strokeWidth={3} /></Button>
           </div>
         </div>
@@ -2813,7 +3019,13 @@ Al Habib Pharmacy Team`;
             if (editableProducts.length > 0) {
                 for (const p of editableProducts) {
                     const { id, ...rest } = p;
-                    await db.updateProduct(id, rest); 
+                    // Fix: Reset status to pending if it was revision_required
+                    const updates = { ...rest };
+                    if (p.status === 'revision_required') {
+                        updates.status = 'pending';
+                        updates.rejection_reason = null;
+                    }
+                    await db.updateProduct(id, updates); 
                 }
             }
             
@@ -2928,13 +3140,18 @@ Al Habib Pharmacy Team`;
 
     const renderEditableField = (label: string, field: keyof Product, p: Product, type = 'text', options?: string[]) => {
         const value = p[field];
+        // Only allow editing products that require revision when in correction mode
+        const isProductEditable = (isCorrection && p.status === 'revision_required') 
+            ? true 
+            : (isCorrection ? false : isEditable);
+
         return (
              <EditableField 
                 label={label}
                 value={value}
                 type={type}
                 options={options}
-                disabled={!isEditable}
+                disabled={!isProductEditable}
                 onChange={(newValue: any) => handleProductChange(p.id, field as string, newValue)}
              />
         );
@@ -2971,7 +3188,33 @@ Al Habib Pharmacy Team`;
         <div className="flex items-center gap-4 md:gap-6 w-full">
           <button onClick={() => setView('dashboard')} className="p-3 bg-[#0F3D3E] border-2 border-[#0F3D3E] rounded-xl text-white hover:bg-[#0F3D3E]/90 hover:scale-105 transition-all shadow-md"><ArrowLeft size={24} strokeWidth={3} /></button>
           <div className="flex-1">
-            <h2 className="text-2xl md:text-4xl font-serif font-black text-[#0F3D3E] tracking-tight mb-2 break-all">{currentRequest?.request_number}</h2>
+            <div className="flex items-center gap-4 flex-wrap">
+                <h2 className="text-2xl md:text-3xl font-serif font-black text-[#0F3D3E] tracking-tight mb-2 break-all">{currentRequest?.request_number || 'New Request'}</h2>
+                {currentRequest?.status && (
+                     <div className={`
+                        px-4 py-1.5 rounded-lg border-2 shadow-sm font-bold uppercase tracking-widest text-[10px] flex items-center gap-2 mb-2
+                        ${(currentRequest.status === 'completed' || currentRequest.status === 'approved_pending_erp')
+                            ? 'bg-emerald-50 border-emerald-600 text-emerald-800'
+                            : currentRequest.status === 'rejected' 
+                                ? 'bg-red-50 border-red-600 text-red-800'
+                                : currentRequest.status === 'partially_approved'
+                                    ? 'bg-gradient-to-r from-emerald-50 to-red-50 border-gray-200 text-[#0F3D3E]'
+                                    : 'bg-amber-50 border-amber-600 text-amber-800'} 
+                     `}>
+                        {(currentRequest.status === 'completed' || currentRequest.status === 'approved_pending_erp') && <CheckCircle size={14} className="text-emerald-600" />}
+                        {currentRequest.status === 'rejected' && <XCircle size={14} className="text-red-600" />}
+                        {currentRequest.status === 'partially_approved' && <ShieldCheck size={14} className="text-amber-600" />}
+                        {['in_review', 'submitted', 'pending', 'vendor_revision_required', 'draft'].includes(currentRequest.status) && <Clock size={14} className="text-amber-600" />}
+                        <span>
+                            {currentRequest.status === 'completed' || currentRequest.status === 'approved_pending_erp' ? 'Approved' : 
+                             currentRequest.status === 'rejected' ? 'Rejected' : 
+                             currentRequest.status === 'partially_approved' ? 'Partially Approved' : 
+                             currentRequest.status === 'vendor_revision_required' ? 'Revision Required' :
+                             'Pending Approval'}
+                        </span>
+                     </div>
+                )}
+            </div>
             <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
                <Badge 
                  status={currentRequest?.status || 'draft'}
@@ -3024,16 +3267,63 @@ Al Habib Pharmacy Team`;
             <Card title="Product Listing Details" className="bg-white shadow-sm border border-gray-100">
                <div className="space-y-6">
                  {!selectedProductId ? (
+                    <>
+                    {isRequestActionable && selectedProductIds.length > 0 && (
+                        <div className="bg-white p-4 mb-4 rounded-xl shadow-lg border-2 border-[#C5A065]/30 flex flex-col md:flex-row items-center justify-between gap-4 animate-in slide-in-from-top-4 duration-300 sticky top-40 z-20">
+                            <div className="flex items-center gap-3">
+                                <span className="bg-[#0F3D3E] text-white w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm shadow-sm">
+                                    {selectedProductIds.length}
+                                </span>
+                                <p className="font-black text-[#0F3D3E] text-sm uppercase tracking-wide">Selected</p>
+                            </div>
+                            
+                            <div className="flex-1 w-full md:w-auto flex flex-col md:flex-row gap-3 items-center">
+                                <div className="flex-1 w-full">
+                                    <input 
+                                        type="text" 
+                                        placeholder="Add comment regarding decision..." 
+                                        defaultValue={bulkCommentRef.current}
+                                        onChange={(e) => bulkCommentRef.current = e.target.value}
+                                        className="w-full h-10 px-4 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-[#C5A065] focus:border-[#C5A065] outline-none shadow-inner"
+                                    />
+                                </div>
+                                <div className="flex gap-2 w-full md:w-auto">
+                                    <Button size="sm" onClick={() => applyBulkStatus('approved')} className="!bg-emerald-600 hover:!bg-emerald-700 !text-white !border-emerald-600 flex-1 md:flex-none font-bold shadow-md shadow-emerald-900/10 px-4 bg-none" title="Approve Selected">
+                                        <CheckCircle size={18} strokeWidth={2.5} />
+                                        <span className="hidden sm:inline ml-2">Approve</span>
+                                    </Button>
+                                    <Button size="sm" onClick={() => applyBulkStatus('revision_required', bulkCommentRef.current)} className="!bg-amber-500 hover:!bg-amber-600 !text-white !border-amber-500 flex-1 md:flex-none font-bold shadow-md shadow-amber-900/10 px-4 bg-none" title="Request Revision">
+                                        <RotateCcw size={18} strokeWidth={2.5} />
+                                        <span className="hidden sm:inline ml-2">Revision</span>
+                                    </Button>
+                                    <Button size="sm" onClick={() => applyBulkStatus('rejected', bulkCommentRef.current)} className="!bg-red-600 hover:!bg-red-700 !text-white !border-red-600 flex-1 md:flex-none font-bold shadow-md shadow-red-900/10 px-4 bg-none" title="Reject Selected">
+                                        <XCircle size={18} strokeWidth={2.5} />
+                                        <span className="hidden sm:inline ml-2">Reject</span>
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                     <div className="overflow-x-auto rounded-xl border border-gray-100">
                         <table className="w-full text-left text-sm">
                             <thead>
                                 <tr className="bg-[#0F3D3E] border-b border-gray-100 text-[10px] text-white uppercase tracking-widest font-black font-serif">
+                                    {isRequestActionable && (
+                                        <th className="p-4 w-10 text-center">
+                                            <input 
+                                                type="checkbox" 
+                                                onChange={handleSelectAll}
+                                                checked={selectedProductIds.length > 0 && selectedProductIds.length === (isEditable ? editableProducts : products).length}
+                                                className="w-4 h-4 rounded border-gray-300 text-[#0F3D3E] focus:ring-[#C5A065]"
+                                            />
+                                        </th>
+                                    )}
                                     <th className="p-4 pl-6">Brand</th>
                                     <th className="p-4">Product Name</th>
                                     <th className="p-4 text-right">Cost Price</th>
                                     <th className="p-4 text-right">Selling Price</th>
                                     <th className="p-4 text-center">Margin</th>
-                                    <th className="p-4 text-center">Taxable</th>
+                                    <th className="p-4 text-center">Status</th>
                                     <th className="p-4 text-right pr-6">Action</th>
                                 </tr>
                             </thead>
@@ -3055,6 +3345,16 @@ Al Habib Pharmacy Team`;
 
                                     return (
                                     <tr key={p.id} className="hover:bg-gray-50 transition-colors group cursor-pointer" onClick={() => setSelectedProductId(p.id)}>
+                                        {isRequestActionable && (
+                                            <td className="p-4 text-center" onClick={(e) => e.stopPropagation()}>
+                                                <input 
+                                                    type="checkbox" 
+                                                    checked={selectedProductIds.includes(p.id)}
+                                                    onChange={(e) => handleCheckboxChange(p.id, e.target.checked)}
+                                                    className="w-4 h-4 rounded border-gray-300 text-[#0F3D3E] focus:ring-[#C5A065]"
+                                                />
+                                            </td>
+                                        )}
                                         <td className="p-4 pl-6 font-black text-base tracking-wide" style={{ color: brandColor }}>{p.brand}</td>
                                         <td className="p-4 text-[#0F3D3E] font-medium">{p.product_name}</td>
                                         <td className="p-4 text-right font-mono font-bold text-rose-600">{p.currency} {Number(p.price_cost).toFixed(2)}</td>
@@ -3065,13 +3365,43 @@ Al Habib Pharmacy Team`;
                                                 : '-'}
                                         </td>
                                         <td className="p-4 text-center">
-                                            <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${p.taxable ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                                                {p.taxable ? 'Yes' : 'No'}
-                                            </span>
+                                            {(() => {
+                                                let status = p.status || 'pending';
+                                                
+                                                // Override: Only confirm 'approved' status if workflow is completed or partially approved
+                                                // Otherwise, it appears as 'Pending' to represent "Pending current Step Approval"
+                                                // Unless the user is editing it (Active Approver)
+                                                if (status === 'approved' && !isRequestActionable) {
+                                                     const isFinal = currentRequest?.status === 'completed' || currentRequest?.status === 'partially_approved' || currentRequest?.status === 'approved_pending_erp';
+                                                     const hasItemCode = !!p.erp_item_code && p.erp_item_code.trim().length > 0;
+                                                     
+                                                     if (!isFinal && !hasItemCode) {
+                                                         status = 'pending';
+                                                     }
+                                                }
+
+                                                const statusMap = {
+                                                    'pending': 'Pending',
+                                                    'approved': 'Approved',
+                                                    'rejected': 'Rejected',
+                                                    'revision_required': 'Revision Request'
+                                                };
+                                                
+                                                let statusColor = 'bg-orange-50 text-orange-700'; // Pending
+                                                if (status === 'approved') statusColor = 'bg-green-50 text-green-700';
+                                                else if (status === 'rejected') statusColor = 'bg-red-50 text-red-700';
+                                                else if (status === 'revision_required') statusColor = 'bg-amber-100 text-amber-800';
+
+                                                return (
+                                                    <span className={`px-2 py-1 rounded-md text-[10px] font-black uppercase tracking-wider shadow-sm whitespace-nowrap ${statusColor}`}>
+                                                        {statusMap[status] || 'Pending'}
+                                                    </span>
+                                                );
+                                            })()}
                                         </td>
                                         <td className="p-4 text-right pr-6">
-                                            <Button size="sm" className="bg-[#0F3D3E] text-white hover:bg-[#0F3D3E]/90 shadow-sm transition-all hover:scale-105" onClick={(e: any) => { e.stopPropagation(); setSelectedProductId(p.id); }}>
-                                                View <ChevronRight size={14} className="ml-1" />
+                                            <Button size="sm" className="!px-3 !py-1 !text-[10px] font-bold bg-[#0F3D3E] text-white hover:bg-[#0F3D3E]/90 shadow-sm transition-all hover:scale-105" onClick={(e: any) => { e.stopPropagation(); setSelectedProductId(p.id); }}>
+                                                View <ChevronRight size={12} className="ml-1" />
                                             </Button>
                                         </td>
                                     </tr>
@@ -3084,6 +3414,7 @@ Al Habib Pharmacy Team`;
                             </tbody>
                         </table>
                     </div>
+                 </>
                  ) : (
                     <>
                     <div className="flex items-center justify-between mb-4">
@@ -3318,9 +3649,94 @@ Al Habib Pharmacy Team`;
                                 })}
                              </div>
                         </div>
+
+                      {/* Product Approval Actions */}
+                      {(isRequestActionable || p.status) && (
+                          <div className="mt-8 pt-8 border-t-2 border-[#0F3D3E]">
+                              <h5 className="font-serif font-black text-[#0F3D3E] text-lg uppercase tracking-widest mb-6 flex items-center gap-2">
+                                   Product Approval Decision
+                              </h5>
+                              
+                              <div className="bg-[#F8FAFA] p-6 rounded-2xl border border-gray-200 shadow-inner">
+                                  <div className="flex flex-col md:flex-row gap-8">
+                                      <div className="flex-1 space-y-4">
+                                          <p className="text-xs font-black uppercase text-[#0F3D3E] tracking-widest mb-2">Status</p>
+                                          <div className="flex gap-4">
+                                               {(['approved', 'revision_required', 'rejected'] as const).map(option => (
+                                                   <label key={option} className={`
+                                                      flex items-center gap-2 px-4 py-3 rounded-xl border-2 cursor-pointer transition-all flex-1 justify-center
+                                                      ${(p.status === option) ? 
+                                                          (option === 'approved' ? 'bg-emerald-50 border-emerald-600' : 
+                                                           option === 'revision_required' ? 'bg-amber-50 border-amber-600' : 
+                                                           'bg-red-50 border-red-600') 
+                                                          : 'border-gray-200 hover:border-[#0F3D3E]'}
+                                                   `}>
+                                                       <input 
+                                                           type="radio" 
+                                                           name={`status-${p.id}`} 
+                                                           checked={p.status === option} 
+                                                           onChange={() => {
+                                                               if (isRequestActionable) {
+                                                                  // Optimistic update
+                                                                  const updatedProducts = (isEditable ? editableProducts : products).map(prod => prod.id === p.id ? { ...prod, status: option } : prod);
+                                                                  setProducts(prev => prev.map(prod => prod.id === p.id ? { ...prod, status: option } : prod)); // Update main state too if separated
+                                                                  // Fix: Also update editableProducts which might be used later in processWorkflowAction
+                                                                  setEditableProducts(prev => prev.map(prod => prod.id === p.id ? { ...prod, status: option } : prod));
+                                                                  
+                                                                  // Async Save
+                                                                  db.updateProduct(p.id, { status: option });
+                                                               }
+                                                           }}
+                                                           className={`w-4 h-4 ${
+                                                               option === 'approved' ? 'accent-emerald-600' :
+                                                               option === 'revision_required' ? 'accent-amber-600' :
+                                                               'accent-red-600'
+                                                           }`}
+                                                           disabled={!isRequestActionable}
+                                                       />
+                                                       <span className={`font-bold uppercase text-xs tracking-wider
+                                                           ${option === 'approved' ? 'text-emerald-800' : ''}
+                                                           ${option === 'revision_required' ? 'text-amber-800' : ''}
+                                                           ${option === 'rejected' ? 'text-red-800' : ''}
+                                                       `}>
+                                                           {option === 'revision_required' ? 'Revision' : option}
+                                                       </span>
+                                                   </label>
+                                               ))}
+                                          </div>
+                                      </div>
+                                      
+                                      <div className="flex-[2]">
+                                          <p className="text-xs font-black uppercase text-[#0F3D3E] tracking-widest mb-2">
+                                              {p.status === 'revision_required' ? 'Correction Instructions' : 
+                                               p.status === 'rejected' ? 'Rejection Reason' : 'Comments'}
+                                          </p>
+                                          <SafeTextArea 
+                                              className="w-full h-24 p-4 rounded-xl border-2 border-gray-200 text-sm focus:border-[#C5A065] focus:ring-0 transition-colors resize-none disabled:bg-gray-100 disabled:text-gray-500"
+                                              placeholder="Add specific comments for this product..."
+                                              value={p.rejection_reason || ''}
+                                              onChange={() => {}} // Optimized: Don't update parent state on every keystroke to prevent re-renders
+                                              onBlur={(e: any) => {
+                                                   const newReason = e.target.value;
+                                                   // Update state and DB on blur only
+                                                   setProducts(prev => prev.map(prod => prod.id === p.id ? { ...prod, rejection_reason: newReason } : prod));
+                                                   setEditableProducts(prev => prev.map(prod => prod.id === p.id ? { ...prod, rejection_reason: newReason } : prod));
+                                                   
+                                                   if (isRequestActionable) {
+                                                       db.updateProduct(p.id, { rejection_reason: newReason });
+                                                   }
+                                              }}
+                                              disabled={!isRequestActionable}
+                                          />
+                                      </div>
+                                  </div>
+                              </div>
+                          </div>
+                      )}
                       </div>
                    </div>
                  ))}
+
                  </>
                  )}
                </div>
@@ -3466,11 +3882,39 @@ Al Habib Pharmacy Team`;
              {isRequestActionable && (
                <Card title="Review Actions" className="bg-[#0F3D3E] text-white border-none shadow-xl shadow-[#0F3D3E]/30">
                  <div className="space-y-4 pt-2">
-                   <Button className="w-full h-14 bg-white text-[#0F3D3E] hover:bg-[#C5A065] hover:text-white border-none rounded-xl font-bold uppercase tracking-widest transition-colors duration-300" onClick={() => { setActionType('approve'); setIsActionModalOpen(true); }}>Approve Step</Button>
-                   <div className="grid grid-cols-2 gap-4">
-                     <Button variant="outline" className="bg-amber-500 text-white border-none hover:bg-amber-600 h-12 shadow-lg shadow-amber-900/20" onClick={() => { setActionType('return'); setIsActionModalOpen(true); }}>Request Revision</Button>
-                     <Button variant="danger" className="bg-red-600 !text-white border-none hover:bg-red-700 h-12 shadow-lg shadow-red-900/40 font-bold tracking-wider" onClick={() => { setActionType('reject'); setIsActionModalOpen(true); }}>Reject Request</Button>
+                   <div className="bg-white/10 p-4 rounded-lg mb-4 text-sm font-light">
+                       <p className="mb-2 font-bold text-[#C5A065]">Review Summary:</p>
+                       <ul className="list-disc list-inside space-y-1 text-xs">
+                           <li><span className="text-emerald-400 font-bold">Approved:</span> {products.filter(p => p.status === 'approved').length}</li>
+                           <li><span className="text-amber-400 font-bold">Revision:</span> {products.filter(p => p.status === 'revision_required').length}</li>
+                           <li><span className="text-red-400 font-bold">Rejected:</span> {products.filter(p => p.status === 'rejected').length}</li>
+                           <li><span className="text-gray-400 font-bold">Pending:</span> {products.filter(p => !p.status || p.status === 'pending').length}</li>
+                       </ul>
                    </div>
+                   <Button 
+                        className="w-full h-14 bg-white text-[#0F3D3E] hover:bg-[#C5A065] hover:text-white border-none rounded-xl font-bold uppercase tracking-widest transition-colors duration-300" 
+                        onClick={() => { 
+                            // Determine action automatically based on products
+                            const pendingCount = products.filter(p => !p.status || p.status === 'pending').length;
+                            if (pendingCount > 0) {
+                                alert(`Please set a status for all products before submitting. (${pendingCount} pending)`);
+                                return;
+                            }
+                            
+                            const hasRevision = products.some(p => p.status === 'revision_required');
+                            const allRejected = products.every(p => p.status === 'rejected');
+                            
+                            // If any item needs revision, the whole request goes back for revision
+                            // If all items are rejected, the request is rejected
+                            // Otherwise (all approved, or mix of approved/rejected), we proceed
+                            const derivedAction = hasRevision ? 'return' : (allRejected ? 'reject' : 'approve');
+                            
+                            setActionType(derivedAction);
+                            setIsActionModalOpen(true); 
+                        }}
+                   >
+                       Submit Decision
+                   </Button>
                  </div>
                </Card>
              )}
@@ -3741,14 +4185,14 @@ Al Habib Pharmacy Team`;
           <div className="p-4 md:p-6 flex flex-col gap-3">
             {activePortal === 'employee' && currentUserEmployee?.role === 'e_commerce_admin' ? (
                 <>
-                    <p className={`px-4 text-[10px] font-black text-gray-300 uppercase tracking-widest ${!isSidebarOpen ? 'md:hidden' : ''}`}>E-Commerce</p>
+                    <p className={`px-4 text-[10px] font-black text-[#0F3D3E] uppercase tracking-widest ${!isSidebarOpen ? 'md:hidden' : ''}`}>E-Commerce</p>
                     <SidebarItem icon={Download} label="Products Export" active={view === 'ecommerce_export'} onClick={() => { setView('ecommerce_export'); if(window.innerWidth < 768) setIsSidebarOpen(false); }} collapsed={!isSidebarOpen} />
                     <SidebarItem icon={FileText} label="Modifications Report" active={view === 'existing_modifications_report'} onClick={() => { setView('existing_modifications_report'); if(window.innerWidth < 768) setIsSidebarOpen(false); }} collapsed={!isSidebarOpen} />
                     <SidebarItem icon={Settings} label="Preferences" active={view === 'preferences'} onClick={() => { setView('preferences'); if(window.innerWidth < 768) setIsSidebarOpen(false); }} collapsed={!isSidebarOpen} />
                 </>
             ) : (
                 <>
-                    <p className={`px-4 text-[10px] font-black text-gray-300 uppercase tracking-widest ${!isSidebarOpen ? 'md:hidden' : ''}`}>General</p>
+                    <p className={`px-4 text-[10px] font-black text-[#0F3D3E] uppercase tracking-widest ${!isSidebarOpen ? 'md:hidden' : ''}`}>General</p>
                     <SidebarItem icon={LayoutDashboard} label="Main Hub" active={view === 'dashboard'} onClick={() => { setView('dashboard'); if(window.innerWidth < 768) setIsSidebarOpen(false); }} collapsed={!isSidebarOpen} />
                     {activePortal === 'vendor' && <SidebarItem icon={Building2} label="Company Profile" active={view === 'vendor_profile'} onClick={() => { setView('vendor_profile'); if(window.innerWidth < 768) setIsSidebarOpen(false); }} collapsed={!isSidebarOpen} />}
                     {activePortal === 'employee' && <SidebarItem icon={Briefcase} label="Task Inbox" active={view === 'employee_inbox'} onClick={() => { setView('employee_inbox'); if(window.innerWidth < 768) setIsSidebarOpen(false); }} collapsed={!isSidebarOpen} />}

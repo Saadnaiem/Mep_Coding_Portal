@@ -24,7 +24,9 @@ export const getCategoryManagerForDivision = async (divisionName: string) => {
     .maybeSingle();
     
   if (error || !data) return null;
-  return data.profiles;
+  // Handle case where profiles might be returned as array by Supabase client
+  const profile = Array.isArray(data.profiles) ? data.profiles[0] : data.profiles;
+  return profile;
 };
 
 // 4. Get Divisions for Manager (Reverse Lookup)
