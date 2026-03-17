@@ -121,13 +121,13 @@ const SidebarItem: React.FC<{
       w-full flex items-center gap-4 px-5 py-4 rounded-xl transition-all duration-300 group
       ${active 
         ? 'bg-[#0F3D3E] text-white shadow-lg shadow-[#0F3D3E]/20' 
-        : 'text-[#0F3D3E]/70 hover:bg-[#F0F4F4] hover:text-[#0F3D3E]'}
+        : 'text-[#0F3D3E]/70 hover:bg-[#0F3D3E] hover:text-white hover:shadow-lg hover:shadow-[#0F3D3E]/10'}
       ${collapsed ? 'justify-center px-0' : ''}
     `}
   >
     <Icon size={20} className={`transition-colors duration-300 ${active ? 'text-[#C5A065]' : 'text-[#C5A065]/60 group-hover:text-[#C5A065]'}`} />
     {!collapsed && (
-      <span className={`text-sm font-bold tracking-wide whitespace-nowrap overflow-hidden font-serif ${active ? 'text-white' : ''}`}>
+      <span className={`text-sm font-bold tracking-wide whitespace-nowrap overflow-hidden font-serif ${active ? 'text-white' : 'group-hover:text-white'}`}>
         {label}
       </span>
     )}
@@ -279,6 +279,7 @@ const App: React.FC = () => {
     mobile: ''
   });
   const [authError, setAuthError] = useState('');
+  const [isSigningIn, setIsSigningIn] = useState(false);
   const [showEmailConfirmation, setShowEmailConfirmation] = useState(false);
 
   // App State
@@ -649,6 +650,7 @@ const App: React.FC = () => {
 
   const handleLogout = () => {
     setIsAuthenticated(false);
+    setIsSigningIn(false);
     setRequests([]);
     setProducts([]);
     setActions([]);
@@ -684,6 +686,10 @@ const App: React.FC = () => {
     }
     
     try {
+      setIsSigningIn(true);
+      // Add delay to allow the "Welcome" animation and message to be fully seen
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
       if (authMode === 'signup') {
         // ... (Vendor Signup Logic) ...
         const { data, error } = await supabase.auth.signUp({
@@ -767,11 +773,13 @@ const App: React.FC = () => {
 
           } else {
              setAuthError('Profile not found.');
+             setIsSigningIn(false);
           }
         }
       }
     } catch (err: any) {
       setAuthError(err.message || 'Authentication failed');
+      setIsSigningIn(false);
     }
   };
 
@@ -2459,7 +2467,7 @@ Al Habib Pharmacy Team`;
   const Header = () => (
     <header className="h-20 md:h-60 bg-white border-b border-[#C5A065]/20 flex items-center justify-between px-4 md:px-10 sticky top-0 z-50 shadow-sm/50 backdrop-blur-md bg-white/95">
       <div className="flex items-center gap-3 md:gap-8">
-        <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2.5 hover:bg-[#F0F4F4] rounded-xl transition-all text-[#0F3D3E]">
+        <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className={`p-2.5 rounded-xl transition-all duration-300 text-[#0F3D3E] hover:bg-[#0F3D3E] hover:text-white hover:rotate-90 hover:shadow-lg hover:shadow-[#0F3D3E]/20 active:scale-90 ${isSidebarOpen ? 'translate-x-2 bg-[#F0F4F4]' : ''}`}>
           <Menu size={24} className="md:w-7 md:h-7" />
         </button>
         <div className="flex items-center gap-3 md:gap-5 cursor-pointer group" onClick={() => setView('dashboard')}>
@@ -2482,7 +2490,10 @@ Al Habib Pharmacy Team`;
               : currentUserProfile?.company_name || 'Vendor'}
           </span>
         </div>
-        <button onClick={handleLogout} className="text-gray-400 hover:text-red-700 p-2 transition-colors"><LogOut size={20} className="md:w-6 md:h-6" /></button>
+        <button onClick={handleLogout} className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-red-600 text-white hover:bg-red-700 shadow-md hover:shadow-xl hover:shadow-red-600/30 hover:scale-105 active:rotate-180 transition-all duration-300 group">
+            <span className="hidden md:block text-[10px] font-black uppercase tracking-widest group-active:rotate-180 transition-transform">Sign Out</span>
+            <LogOut size={18} strokeWidth={2.5} className="group-active:rotate-180 transition-transform" />
+        </button>
       </div>
     </header>
   );
@@ -4005,8 +4016,19 @@ Al Habib Pharmacy Team`;
                     <Input className="!py-3 !text-xs" label="Email" type="email" value={authForm.email} onChange={e => setAuthForm({...authForm, email: e.target.value})} required />
                     <Input className="!py-3 !text-xs" label="Password" type="password" value={authForm.password} onChange={e => setAuthForm({...authForm, password: e.target.value})} placeholder="••••••••" required />
                 </div>
-                <Button type="submit" className="w-full h-14 text-sm rounded-xl bg-[#0F3D3E] hover:bg-[#0F3D3E]/90 shadow-xl text-white border-none mt-4 transition-transform hover:scale-[1.02]">
-                    {authMode === 'login' ? 'Access Vendor Portal' : 'Create Account'} <ArrowRight size={18} strokeWidth={3} />
+                <Button type="submit" disabled={isSigningIn} className={`w-full h-14 text-sm rounded-xl bg-[#0F3D3E] hover:bg-[#0F3D3E]/90 shadow-xl text-white border-none mt-4 transition-all duration-500 relative overflow-hidden group disabled:opacity-100 ${isSigningIn ? 'rotate-180 cursor-default pointer-events-none' : 'hover:scale-[1.02] active:scale-[0.98]'}`}>
+                    <div className={`absolute inset-0 flex items-center justify-center gap-2 transition-opacity duration-300 ${isSigningIn ? 'opacity-0' : 'opacity-100'}`}>
+                        <span className="inline-block transition-transform duration-500 font-bold uppercase tracking-wider text-[10px] md:text-xs">
+                            {authMode === 'login' ? 'Access Vendor Portal' : 'Create Account'}
+                        </span>
+                        <ArrowRight size={18} strokeWidth={3} className="transition-transform duration-500 ml-2" />
+                    </div>
+                    
+                    <div className={`absolute inset-0 flex items-center justify-center transition-opacity duration-300 ${isSigningIn ? 'opacity-100' : 'opacity-0'}`}>
+                        <span className="inline-block rotate-180 font-black text-xs md:text-sm tracking-widest text-[#E6D780] uppercase text-center px-1 leading-snug shadow-none drop-shadow-none antialiased decoration-0">
+                            Welcome to Al Habib<br/>Pharmacy Coding Portal
+                        </span>
+                    </div>
                 </Button>
                 <div className="pt-4 border-t border-gray-100 text-center">
                     <button type="button" onClick={() => navigate('/staff')} className="w-full px-6 py-4 rounded-xl bg-[#C5A065] text-white text-sm font-bold uppercase tracking-wider hover:bg-[#b08d55] transition-colors shadow-lg">Access Staff Portal Instead</button>
@@ -4059,8 +4081,19 @@ Al Habib Pharmacy Team`;
                      <Input className="!py-3 !text-xs" label="Password" type="password" value={authForm.password} onChange={e => setAuthForm({...authForm, password: e.target.value})} placeholder="••••••••" required />
                  </div>
 
-                 <Button type="submit" className="w-full h-14 text-sm rounded-xl bg-[#0F3D3E] hover:bg-[#0F3D3E]/90 shadow-xl text-white border-none mt-4 transition-transform hover:scale-[1.02]" >
-                    Sign In Securely <ArrowRight size={18} strokeWidth={3} />
+                 <Button type="submit" disabled={isSigningIn} className={`w-full h-14 text-sm rounded-xl bg-[#0F3D3E] hover:bg-[#0F3D3E]/90 shadow-xl text-white border-none mt-4 transition-all duration-500 relative overflow-hidden group disabled:opacity-100 ${isSigningIn ? 'rotate-180 cursor-default pointer-events-none' : 'hover:scale-[1.02] active:scale-[0.98]'}`}>
+                    <div className={`absolute inset-0 flex items-center justify-center gap-2 transition-opacity duration-300 ${isSigningIn ? 'opacity-0' : 'opacity-100'}`}>
+                        <span className="inline-block transition-transform duration-500 font-bold uppercase tracking-wider text-[10px] md:text-xs">
+                            Sign In Securely
+                        </span>
+                        <ArrowRight size={18} strokeWidth={3} className="transition-transform duration-500 ml-2" />
+                    </div>
+                    
+                    <div className={`absolute inset-0 flex items-center justify-center transition-opacity duration-300 ${isSigningIn ? 'opacity-100' : 'opacity-0'}`}>
+                        <span className="inline-block rotate-180 font-black text-xs md:text-sm tracking-widest text-[#E6D780] uppercase text-center px-1 leading-snug shadow-none drop-shadow-none antialiased decoration-0">
+                             Welcome to Al Habib<br/>Pharmacy Coding Portal
+                        </span>
+                    </div>
                  </Button>
 
                  <div className="pt-4 border-t border-gray-100 text-center">
