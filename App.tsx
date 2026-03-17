@@ -329,7 +329,7 @@ const App: React.FC = () => {
                    navigate('/staff');
                }
                // activePortal syncs via another effect, but force set here to avoid render flicker if needed
-               // setActivePortal('employee'); 
+               setActivePortal('employee'); 
 
                setCurrentUserEmployee({
                   id: profile.id,
@@ -341,6 +341,7 @@ const App: React.FC = () => {
                if (isStaffUrl) {
                    navigate('/');
                }
+               setActivePortal('vendor');
                
                // Vendor Logic
                const vendor = await db.getVendorByContactId(profile.id);
