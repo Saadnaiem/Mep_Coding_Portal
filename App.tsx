@@ -550,6 +550,13 @@ const App: React.FC = () => {
         : p,
     );
     setProducts(updatedProducts);
+    setEditableProducts((prev) =>
+      prev.map((p) =>
+        selectedProductIds.includes(p.id)
+          ? { ...p, status: status, rejection_reason: comment || "" }
+          : p
+      )
+    );
     setSelectedProductIds([]); // Clear selection
     setSelectActionType(null);
     if (bulkCommentRef.current) bulkCommentRef.current = ""; // Clear ref
@@ -4572,11 +4579,11 @@ const App: React.FC = () => {
                               <Button
                                 size="sm"
                                 onClick={() => setSelectedProductIds([])}
-                                className="!bg-gray-100 hover:!bg-gray-200 !text-gray-700 !border-gray-200 flex-1 md:flex-none font-bold shadow-sm px-4 bg-none"
+                                className="!bg-red-50 hover:!bg-red-100 !text-red-600 !border-red-200 flex-1 md:flex-none font-bold shadow-sm px-4 bg-none"
                                 title="Unselect All"
                               >
                                 <X size={18} strokeWidth={2.5} />
-                                <span className="hidden sm:inline ml-2">
+                                <span className="hidden sm:inline ml-2 font-bold text-red-600">
                                   Clear Selection
                                 </span>
                               </Button>
@@ -4696,15 +4703,19 @@ const App: React.FC = () => {
                               return (
                                 <tr
                                   key={p.id}
-                                  className={`transition-colors group cursor-pointer ${
+                                  className={`transition-all duration-300 group cursor-pointer ${
                                     p.status === "approved"
-                                      ? "bg-emerald-50 hover:bg-emerald-100"
+                                      ? "bg-green-100/90 font-medium hover:bg-green-200"
                                       : p.status === "rejected"
-                                        ? "bg-red-50 hover:bg-red-100"
+                                        ? "bg-red-100/90 font-medium hover:bg-red-200"
                                         : p.status === "revision_required"
-                                          ? "bg-amber-50 hover:bg-amber-100"
+                                          ? "bg-yellow-100/90 font-medium hover:bg-yellow-200"
                                           : "hover:bg-gray-50"
                                   }`}
+                                  style={{
+                                    borderLeftWidth: p.status === "approved" || p.status === "rejected" || p.status === "revision_required" ? '6px' : '0px',
+                                    borderLeftColor: p.status === "approved" ? '#22c55e' : p.status === "rejected" ? '#ef4444' : p.status === "revision_required" ? '#eab308' : 'transparent',
+                                  }}
                                   onClick={() => setSelectedProductId(p.id)}
                                 >
                                   {isRequestActionable && (
@@ -5555,15 +5566,16 @@ const App: React.FC = () => {
                 <Card
                   title="Review Actions"
                   className="bg-[#0F3D3E] text-white border-none shadow-xl shadow-[#0F3D3E]/30"
+                  noPadding={true}
                 >
-                  <div className="space-y-4 pt-2">
-                    <div className="bg-white/10 p-4 rounded-lg mb-4 text-sm font-light">
+                  <div className="space-y-2 p-2 sm:p-4">
+                    <div className="bg-white/10 p-2 sm:p-3 rounded-lg mb-2 text-sm font-light">
                       <p className="mb-2 font-bold text-[#C5A065]">
                         Review Summary:
                       </p>
                       <div className="flex flex-wrap items-center gap-4 sm:gap-6 text-xs w-full mt-2">
-                        <div className="flex items-center gap-2 bg-black/20 px-3 py-1.5 rounded-lg border border-white/5">
-                          <span className="text-emerald-400 font-bold tracking-wider">
+                        <div className="flex items-center gap-2 bg-green-500 px-3 py-1.5 rounded-lg border border-white/5">
+                          <span className="text-white font-bold tracking-wider">
                             Approved:
                           </span>
                           <span className="text-white font-black text-sm">
@@ -5573,8 +5585,8 @@ const App: React.FC = () => {
                             }
                           </span>
                         </div>
-                        <div className="flex items-center gap-2 bg-black/20 px-3 py-1.5 rounded-lg border border-white/5">
-                          <span className="text-amber-400 font-bold tracking-wider">
+                        <div className="flex items-center gap-2 bg-yellow-500 px-3 py-1.5 rounded-lg border border-white/5">
+                          <span className="text-white font-bold tracking-wider">
                             Revision:
                           </span>
                           <span className="text-white font-black text-sm">
@@ -5585,8 +5597,8 @@ const App: React.FC = () => {
                             }
                           </span>
                         </div>
-                        <div className="flex items-center gap-2 bg-black/20 px-3 py-1.5 rounded-lg border border-white/5">
-                          <span className="text-red-400 font-bold tracking-wider">
+                        <div className="flex items-center gap-2 bg-red-600 px-3 py-1.5 rounded-lg border border-white/5">
+                          <span className="text-white font-bold tracking-wider">
                             Rejected:
                           </span>
                           <span className="text-white font-black text-sm">
@@ -5596,8 +5608,8 @@ const App: React.FC = () => {
                             }
                           </span>
                         </div>
-                        <div className="flex items-center gap-2 bg-black/20 px-3 py-1.5 rounded-lg border border-white/5">
-                          <span className="text-gray-400 font-bold tracking-wider">
+                        <div className="flex items-center gap-2 bg-orange-500 px-3 py-1.5 rounded-lg border border-white/5">
+                          <span className="text-white font-bold tracking-wider">
                             Pending:
                           </span>
                           <span className="text-white font-black text-sm">
