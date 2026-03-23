@@ -1,0 +1,16 @@
+﻿App.tsx(1181,43): error TS2367: This comparison appears to be unintentional because the types 'RequestStatus' and '"revision_required"' have no overlap.
+components/ExistingProductModification.tsx(748,107): error TS2345: Argument of type '"product_name_en"' is not assignable to parameter of type 'keyof ExistingProductModification'.
+components/ExistingProductModification.tsx(752,107): error TS2345: Argument of type '"product_name_ar"' is not assignable to parameter of type 'keyof ExistingProductModification'.
+components/ExistingProductModification.tsx(788,108): error TS2345: Argument of type '"group"' is not assignable to parameter of type 'keyof ExistingProductModification'.
+components/ExistingProductModification.tsx(789,114): error TS2345: Argument of type '"subgroup"' is not assignable to parameter of type 'keyof ExistingProductModification'.
+components/ItemMasterAssignment.tsx(3,46): error TS2305: Module '"./UI"' has no exported member 'Layout'.
+services/supabase.ts(4,33): error TS2339: Property 'env' does not exist on type 'ImportMeta'.
+services/supabase.ts(5,37): error TS2339: Property 'env' does not exist on type 'ImportMeta'.
+supabase/functions/send-email-notification/index.ts(1,23): error TS2307: Cannot find module 'https://deno.land/std@0.168.0/http/server.ts' or its corresponding type declarations.
+supabase/functions/send-email-notification/index.ts(3,24): error TS2304: Cannot find name 'Deno'.
+supabase/functions/send-email-notification/index.ts(37,23): error TS2304: Cannot find name 'Deno'.
+supabase/functions/send-email-notification/index.ts(152,24): error TS2304: Cannot find name 'Deno'.
+temp_old.tsx(2,20): error TS2307: Cannot find module '../services/database' or its corresponding type declarations.
+temp_old.tsx(3,26): error TS2307: Cannot find module '../services/supabase' or its corresponding type declarations.
+temp_old.tsx(4,89): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+temp_old.tsx(5,36): error TS2307: Cannot find module './UI' or its corresponding type declarations.

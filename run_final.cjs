@@ -1,0 +1,97 @@
+const fs = require('fs');
+let code = fs.readFileSync('App.tsx', 'utf8');
+
+const startStr = '// --- NOTIFICATION LOGIC ---';
+const startIdx = code.indexOf(startStr);
+const setViewIdx = code.indexOf('setView(\'dashboard\');', startIdx);
+const functionEndIdx = code.indexOf('  };', setViewIdx) + 4; // includes "  };"
+
+if (startIdx !== -1 && functionEndIdx !== -1) {
+    const pre = code.substring(0, startIdx);
+    const post = code.substring(functionEndIdx);
+    
+    let newPre = pre;
+    if (!newPre.includes('sendEmailNotification')) {
+        newPre = newPre.replace('import { supabase } from \'./services/supabase\';', 'import { supabase, sendEmailNotification } from \'./services/supabase\';');
+    }
+    
+    const replacement = `    // --- NOTIFICATION LOGIC ---
+    // Calculate Summary
+    const reqProducts = products.filter(p => p.request_id === currentRequest.id);
+    const uniqueBrands = Array.from(new Set(reqProducts.map(p => p.brand))).filter(Boolean);
+    const total_products = reqProducts.length.toString();
+    const brands = uniqueBrands.join(", ") || "N/A";
+
+    // Optimistic UI Update
+    const newActionDisplay = { ...newActionPayload, id: "temp-" + Date.now(), actor_name: currentUserProfile?.full_name || "Me" };
+    setActions([newActionDisplay as any, ...actions]);
+    setRequests(requests.map(r => r.id === currentRequest.id ? { ...r, current_step: nextStep, status: nextStatus, last_action_at: new Date().toISOString() } : r));
+    
+    setIsSaving(false); 
+    setIsActionModalOpen(false); 
+
+    // --- TRIGGER EDGE FUNCTION EMAILS ---
+    let emailSent = false;
+    if (actionType === "approve" && (nextStatus === "in_review" || nextStatus === "approved_pending_ecommerce" || nextStatus === "completed")) {
+        const nextStepDef = MOCK_STEPS.find(s => s.step_number === nextStep);
+        if (nextStepDef) {
+            const employees = await db.fetchEmployeesByRole(nextStepDef.role_required);
+            for (const emp of employees) {
+                if (emp.email) {
+                    await sendEmailNotification({
+                        trigger_type: "STEP_APPROVED",
+                        recipient_email: emp.email,
+                        recipient_name: emp.full_name || emp.role,
+                        request_id: currentRequest.request_number,
+                        dynamic_data: { pending_step: nextStepDef.step_name, total_products, brands }
+                    });
+                    emailSent = true;
+                }
+            }
+        }
+        
+        if (nextStatus === "completed" && currentRequest.vendor?.email_address) {
+            await sendEmailNotification({
+                 trigger_type: "FINAL_APPROVAL",
+                 recipient_email: currentRequest.vendor.email_address,
+                 recipient_name: currentRequest.vendor.company_name,
+                 request_id: currentRequest.request_number,
+                 dynamic_data: { total_products, brands }
+            });
+            emailSent = true;
+        }
+    } else if (actionType === "return" || nextStatus === "vendor_revision_required") {
+        if (currentRequest.vendor?.email_address) {
+             await sendEmailNotification({
+                 trigger_type: "REVISION_REQUIRED",
+                 recipient_email: currentRequest.vendor.email_address,
+                 recipient_name: currentRequest.vendor.company_name,
+                 request_id: currentRequest.request_number,
+                 dynamic_data: { comment: actionComment, total_products, brands }
+             });
+             emailSent = true;
+        }
+    } else if (actionType === "reject" || nextStatus === "rejected") {
+        if (currentRequest.vendor?.email_address) {
+             await sendEmailNotification({
+                 trigger_type: "REJECTED",
+                 recipient_email: currentRequest.vendor.email_address,
+                 recipient_name: currentRequest.vendor.company_name,
+                 request_id: currentRequest.request_number,
+                 dynamic_data: { comment: actionComment, total_products, brands }
+             });
+             emailSent = true;
+        }
+    }
+
+    if (emailSent) {
+        alert("Email notification will be sent immediately to the required parties.");
+    }
+    setView("dashboard");
+  };`;
+    
+    fs.writeFileSync('App.tsx', newPre + replacement + post, 'utf8');
+    console.log('App.tsx updated successfully.');
+} else {
+    console.log('Could not find boundaries.');
+}

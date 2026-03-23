@@ -29,6 +29,7 @@ interface ReportItem {
     sales_price: number;
     margin: number;
     status: string;
+    product_status?: string;
     images?: string[];
 
     // New E-Commerce Fields
@@ -103,6 +104,7 @@ export const Reports: React.FC = () => {
                     sales_price: retail,
                     margin: parseFloat(margin.toFixed(2)),
                     status: req?.status || 'draft',
+                    product_status: p.status,
                     images: p.images || [],
 
                     // New E-Commerce fields
@@ -193,7 +195,7 @@ export const Reports: React.FC = () => {
             'Registration Date', 'Vendor', 'Vendor Type', 'Email', 'Contact Person', 'Mobile', 
             'Division', 'Department', 'Category', 'Sub-Category', 'Class', 
             'Brand', 'Item Code', 'Description (EN)', 'Description (AR)', 
-            'Cost Price', 'Sales Price', 'Margin %',
+            'Cost Price', 'Sales Price', 'Margin %', 'Status',
             // Extended E-Commerce Fields
             'Brand (AR)', 'Short Desc (EN)', 'Short Desc (AR)',
             'Storage (EN)', 'Storage (AR)', 'Composition (EN)', 'Composition (AR)',
@@ -210,6 +212,35 @@ export const Reports: React.FC = () => {
         });
 
         filteredData.forEach(item => {
+            // Updated item code logic:
+            // - Rejected requests -> 'Rejected'
+            // - No Code -> 'Pending'
+            // - Have Code -> code
+            let itemCodeDisplay = item.item_code;
+            if (item.status === 'rejected' || (item.product_status && item.product_status === 'rejected')) {
+                itemCodeDisplay = 'Rejected';
+            } else if (!item.item_code || item.item_code === 'N/A' || item.item_code === 'Pending') {
+                itemCodeDisplay = 'Pending';
+            } else {
+                itemCodeDisplay = item.item_code;
+            }
+
+            // Status Logic: Prioritize Product Status
+            let statusDisplay = item.status;
+            if (item.status === 'rejected' || (item.product_status && item.product_status === 'rejected')) {
+                statusDisplay = 'Rejected';
+            } else if (item.status === 'partially_approved' && item.product_status === 'approved') {
+                statusDisplay = 'Completed';
+            } else {
+                  statusDisplay = item.status === 'completed' ? 'Completed' : 
+                  item.status === 'partially_approved' ? 'Partially Approved' :
+                  item.status === 'rejected' ? 'Rejected' :
+                  item.status === 'in_review' ? 'In Review' : 
+                  item.status === 'approved_pending_erp' ? 'Approved (Pending ERP)' :
+                  item.status === 'approved_pending_ecommerce' ? 'Approved (Pending E-Comm)' :
+                  item.status;
+            }
+
             const row = [
                 new Date(item.created_at).toLocaleDateString(),
                 item.vendor_name,
@@ -223,12 +254,14 @@ export const Reports: React.FC = () => {
                 item.sub_category,
                 item.class_name,
                 item.brand,
-                item.item_code,
+                itemCodeDisplay,
                 item.description_en,
                 item.description_ar,
                 item.cost_price,
                 item.sales_price,
                 `${item.margin}%`,
+                // Status Column
+                statusDisplay,
                 // Extended
                 item.brand_ar || '',
                 item.short_description_en || '',
@@ -274,11 +307,17 @@ export const Reports: React.FC = () => {
     };
 
     const handleEcommerceExport = async () => {
-        // Filter: Status completed AND item_code exists AND not 'N/A'
+        // Filter: Any status (mostly Approved/Completed) where Item Code exists
         const dataToExport = rawData.filter(item => 
-            item.status === 'completed' && 
+            (item.status === 'completed' || 
+             item.status === 'partially_approved' || 
+             item.status === 'approved_pending_ecommerce' ||
+             item.status === 'approved_pending_erp') &&
             item.item_code && 
-            item.item_code !== 'N/A'
+            item.item_code !== 'N/A' &&
+            item.item_code !== 'PENDING' &&
+            item.item_code !== 'Rejected' &&
+            item.item_code !== 'Reject'
         );
 
         if (dataToExport.length === 0) {
@@ -537,7 +576,15 @@ export const Reports: React.FC = () => {
                                             </div>
                                         </td>
                                         <td className="p-4">{item.brand}</td>
-                                        <td className="p-4 font-mono text-xs text-gray-400">{item.item_code}</td>
+                                        <td className="p-4 font-mono text-xs">
+                                            {(item.status === 'rejected' || item.product_status === 'rejected') ? (
+                                                <span className="text-red-600 font-bold">Rejected</span>
+                                            ) : (item.item_code && item.item_code !== 'N/A' && item.item_code !== 'Pending') ? (
+                                                <span className="text-gray-600">{item.item_code}</span>
+                                            ) : (
+                                                <span className="text-amber-500 font-bold">Pending</span>
+                                            )}
+                                        </td>
                                         <td className="p-4 text-[#0F3D3E]">{item.description_en}</td>
                                         <td className="p-4 text-right font-serif">{item.description_ar}</td>
                                         <td className="p-4 font-mono">{item.cost_price.toFixed(2)}</td>

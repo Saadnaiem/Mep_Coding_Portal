@@ -22,12 +22,12 @@ export const Button: React.FC<React.ButtonHTMLAttributes<HTMLButtonElement> & { 
   );
 };
 
-export const Card: React.FC<{ title?: string; children: React.ReactNode; className?: string; noPadding?: boolean }> = ({ title, children, className = '', noPadding = false }) => (
+export const Card: React.FC<{ title?: React.ReactNode; children: React.ReactNode; className?: string; noPadding?: boolean; headerClassName?: string }> = ({ title, children, className = '', noPadding = false, headerClassName }) => (
   <div className={`bg-white rounded-xl shadow-2xl shadow-gray-200/50 border border-gray-100 overflow-hidden ${className}`}>
     {title && (
-      <div className="px-4 py-3 md:px-8 md:py-5 border-b border-gray-50 bg-gradient-to-r from-[#ffffff] to-[#fafafa] flex items-center justify-between relative overflow-hidden">
+      <div className={`px-4 py-3 md:px-8 md:py-5 border-b border-gray-50 flex items-center justify-between relative overflow-hidden ${headerClassName || 'bg-gradient-to-r from-[#ffffff] to-[#fafafa]'}`}>
         <div className="absolute top-0 left-0 w-1 h-full bg-[#C5A065]" />
-        <h3 className="font-serif font-bold text-[#0F3D3E] tracking-wide text-sm">{title}</h3>
+        <h3 className="font-serif font-bold text-[#0F3D3E] tracking-wide text-sm flex items-center gap-2 w-full">{title}</h3>
       </div>
     )}
     <div className={noPadding ? '' : 'p-4 md:p-8'}>
@@ -55,12 +55,32 @@ export const Badge: React.FC<{ status: RequestStatus; labelSuffix?: string; curr
       colorClass = STEP_COLORS[idx];
   }
 
-  return (
+  const isCompletedTypes = status === 'completed' || status === 'partially_approved';
+
+  const badgeContent = (
     <span className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-[10px] font-serif font-bold tracking-widest uppercase shadow-sm border ${colorClass}`}>
       {config.icon && <span className="opacity-70 scale-90">{config.icon}</span>}
-      {config.label}{labelSuffix ? ` - ${labelSuffix}` : ''}
+      {status === 'in_review' && currentStep ? (
+        <span>Step {currentStep} - Under Review</span>
+      ) : (
+        <span>{config.label}</span>
+      )}
+      {labelSuffix ? ` - ${labelSuffix}` : ''}
     </span>
   );
+
+  if (isCompletedTypes) {
+    return (
+      <div className="flex flex-col items-start gap-1">
+        {badgeContent}
+        <span className="text-[10px] text-green-600 font-bold px-1">
+          ERP Code & E-Commerce Approved
+        </span>
+      </div>
+    );
+  }
+
+  return badgeContent;
 };
 
 export const Input: React.FC<React.InputHTMLAttributes<HTMLInputElement> & { label?: string; error?: string }> = ({ label, error, className = '', required, ...props }) => {
@@ -142,18 +162,18 @@ export const FileInput: React.FC<React.InputHTMLAttributes<HTMLInputElement> & {
   );
 };
 
-export const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: string; children: React.ReactNode }> = ({ isOpen, onClose, title, children }) => {
+export const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: string; children: React.ReactNode; maxWidth?: string }> = ({ isOpen, onClose, title, children, maxWidth = 'max-w-lg' }) => {
   if (!isOpen) return null;
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-[#0F3D3E]/60 backdrop-blur-sm animate-in fade-in duration-300">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-4 duration-300 border border-[#C5A065]/20">
-        <div className="px-8 py-6 border-b border-gray-100 flex items-center justify-between bg-[#FDFBF7]">
+      <div className={`bg-white rounded-2xl shadow-2xl w-full ${maxWidth} overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-4 duration-300 border border-[#C5A065]/20 flex flex-col max-h-[95vh]`}>
+        <div className="px-8 py-6 border-b border-gray-100 flex items-center justify-between bg-[#FDFBF7] shrink-0">
           <h3 className="font-serif text-xl font-bold text-[#0F3D3E]">{title}</h3>
           <button onClick={onClose} className="p-2 hover:bg-[#C5A065]/10 text-gray-400 hover:text-[#C5A065] rounded-full transition-colors">
             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         </div>
-        <div className="p-8">
+        <div className="p-8 overflow-y-auto">
           {children}
         </div>
       </div>

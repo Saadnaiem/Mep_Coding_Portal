@@ -182,7 +182,10 @@ class DatabaseService {
       .eq('id', id)
       .single();
 
-    if (error) return null;
+    if (error) {
+       console.error("fetchProfile error for id:", id, error);
+       return null;
+    }
     return data;
   }
   
@@ -342,15 +345,101 @@ class DatabaseService {
 
   // --- Existing Product Modifications ---
   async createExistingModification(mod: Partial<ExistingProductModification>): Promise<boolean> {
-      const { error } = await supabase
-          .from('existing_product_modifications')
-          .insert(mod);
-      
+      // Sanitize input to remove legacy fields that are not in DB schema
+      const safeMod: any = { ...mod };
+      delete safeMod.side_effects_en;
+      delete safeMod.side_effects_ar;
+        delete safeMod.product_name_en; // legacy UI form fields
+        delete safeMod.product_name_ar;
+
+        // Map template fields
+        if (safeMod.category !== undefined && safeMod.template_category === undefined) {
+             safeMod.template_category = safeMod.category;
+             delete safeMod.category;
+        }
+        if (safeMod.group !== undefined) {
+             safeMod.template_group = safeMod.group;
+             delete safeMod.group;
+        }
+        if (safeMod.subgroup !== undefined) {
+             safeMod.template_subgroup = safeMod.subgroup;
+             delete safeMod.subgroup;
+        }
+
+        // Map POP hierarchy fields to actual hierarchy DB fields
+        if (safeMod.category_pop !== undefined) {
+             safeMod.category = safeMod.category_pop;
+             delete safeMod.category_pop;
+        }
+        if (safeMod.sub_category_pop !== undefined) {
+             safeMod.sub_category = safeMod.sub_category_pop;
+             delete safeMod.sub_category_pop;
+        }
+
+        const { error } = await supabase
+            .from('existing_product_modifications')
+            .insert(safeMod);
+
+        if (error) {
+            console.error('Error creating existing product modification:', error);
+            alert('Failed to submit: ' + error.message);
+            return false;
+        }
+        return true;
+    }
+
+    async updateExistingModification(id: string, updates: Partial<ExistingProductModification>): Promise<boolean> {
+        // Sanitize input
+        const safeUpdates: any = { ...updates };
+        delete safeUpdates.side_effects_en;
+        delete safeUpdates.side_effects_ar;
+        delete safeUpdates.product_name_en; // legacy UI form fields
+        delete safeUpdates.product_name_ar;
+
+        // Map template fields
+        if (safeUpdates.category !== undefined && safeUpdates.template_category === undefined) {
+             safeUpdates.template_category = safeUpdates.category;
+             delete safeUpdates.category;
+        }
+        if (safeUpdates.group !== undefined) {
+             safeUpdates.template_group = safeUpdates.group;
+             delete safeUpdates.group;
+        }
+        if (safeUpdates.subgroup !== undefined) {
+             safeUpdates.template_subgroup = safeUpdates.subgroup;
+             delete safeUpdates.subgroup;
+        }
+
+        // Map POP hierarchy fields
+        if (safeUpdates.category_pop !== undefined) {
+             safeUpdates.category = safeUpdates.category_pop;
+             delete safeUpdates.category_pop;
+        }
+        if (safeUpdates.sub_category_pop !== undefined) {
+             safeUpdates.sub_category = safeUpdates.sub_category_pop;
+             delete safeUpdates.sub_category_pop;
+        }
+
+        const { data, error } = await supabase
+            .from('existing_product_modifications')
+            .update(safeUpdates)
+            .eq('id', id)
+            .select();
+
+      console.log('Update result:', { data, error, id, safeUpdates });
+
       if (error) {
-          console.error('Error creating existing product modification:', error);
-          alert('Failed to submit: ' + error.message);
+          console.error('Error updating existing modification:', error);
+          alert('Failed to update: ' + error.message);
           return false;
       }
+
+      if (!data || data.length === 0) {
+          console.warn('Update matched no rows (RLS issue or wrong ID)!');
+          alert('Failed to update: item not found or permission denied (RLS).');
+          return false;
+      }
+
       return true;
   }
 

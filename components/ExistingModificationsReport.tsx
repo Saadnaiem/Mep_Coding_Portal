@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { db } from '../services/database';
+import { sendEmailNotification } from '../services/supabase';
 import { ExistingProductModification } from '../types';
-import { Button, Card, Input } from './UI';
-import { Download, RefreshCw, Image as ImageIcon, Search, User, Mail, Phone } from 'lucide-react';
+import { Button, Card, Input, Modal } from './UI';
+import { CheckCircle2, Download, Eye, Image as ImageIcon, RefreshCw, RotateCcw, Search, User, Mail, Phone } from 'lucide-react';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 
@@ -10,6 +11,9 @@ export const ExistingModificationsReport: React.FC = () => {
     const [data, setData] = useState<ExistingProductModification[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
+    const [selectedItem, setSelectedItem] = useState<ExistingProductModification | null>(null);
+    const [decisionComment, setDecisionComment] = useState('');
+    const [isSavingDecision, setIsSavingDecision] = useState(false);
 
     useEffect(() => {
         loadData();
@@ -22,8 +26,7 @@ export const ExistingModificationsReport: React.FC = () => {
         setIsLoading(false);
     };
 
-    // Filter Data by Search Query
-    const filteredData = data.filter(item => {
+    const filteredData = useMemo(() => data.filter(item => {
         if (!searchQuery) return true;
         
         const term = searchQuery.toLowerCase();
@@ -48,7 +51,97 @@ export const ExistingModificationsReport: React.FC = () => {
             }
             return false;
         });
-    });
+    }), [data, searchQuery]);
+
+    const getStatusMeta = (status?: string) => {
+        switch (status) {
+            case 'approved':
+                return {
+                    label: 'Approved',
+                    chipClass: 'bg-emerald-100 text-emerald-800 border border-emerald-200',
+                };
+            case 'revision_required':
+                return {
+                    label: 'Revision Request',
+                    chipClass: 'bg-amber-100 text-amber-800 border border-amber-200',
+                };
+            case 'pending_vendor':
+                return {
+                    label: 'Pending Vendor',
+                    chipClass: 'bg-rose-100 text-rose-800 border border-rose-200',
+                };
+            case 'submitted':
+                return {
+                    label: 'Submitted',
+                    chipClass: 'bg-sky-100 text-sky-800 border border-sky-200',
+                };
+            default:
+                return {
+                    label: status || 'Pending',
+                    chipClass: 'bg-gray-100 text-gray-700 border border-gray-200',
+                };
+        }
+    };
+
+    const openDetails = (item: ExistingProductModification) => {
+        setSelectedItem(item);
+        setDecisionComment(item.rejection_reason || '');
+    };
+
+    const handleDecision = async (status: 'approved' | 'revision_required') => {
+        if (!selectedItem) return;
+
+        if (!decisionComment.trim()) {
+            alert('Please provide an admin comment before making a decision.');
+            return;
+        }
+
+        setIsSavingDecision(true);
+        const nextReason = decisionComment.trim();
+        const success = await db.updateExistingModification(selectedItem.id, {
+            status,
+            rejection_reason: nextReason,
+        });
+
+        setIsSavingDecision(false);
+
+        if (!success) return;
+
+        const vendorEmail = selectedItem.vendor?.email_address;
+        const vendorName = selectedItem.vendor?.company_name || 'Vendor';
+
+                if (vendorEmail) {
+            await sendEmailNotification({
+                 trigger_type: 'MODIFICATION_DECISION',
+                 recipient_email: vendorEmail,
+                 recipient_name: vendorName,
+                 dynamic_data: {
+                      status_label: status === 'approved' ? 'Approved' : 'Revision Required',
+                      total_products: '1',
+                      product_names: selectedItem.name_en,
+                      total_brands: '1',
+                      brands: selectedItem.brand_en || 'N/A',
+                      sku_gtin: selectedItem.sku_gtin,
+                      rejection_reason: nextReason || ''
+                 }
+            });
+        }
+
+        setData(prev => prev.map(item => item.id === selectedItem.id ? {
+            ...item,
+            status,
+            rejection_reason: nextReason,
+        } : item));
+        setSelectedItem(prev => prev ? {
+            ...prev,
+            status,
+            rejection_reason: nextReason,
+        } : prev);
+        
+        alert(status === 'approved' 
+            ? 'Modification approved successfully. Email notification sent to vendor.' 
+            : 'Revision request and email notification sent to vendor successfully.');
+    };
 
     const handleExport = async () => {
         const workbook = new ExcelJS.Workbook();
@@ -74,8 +167,8 @@ export const ExistingModificationsReport: React.FC = () => {
         filteredData.forEach(item => {
              const row = [
                  item.sku_gtin,
-                 item.product_name_en,
-                 item.product_name_ar,
+                 item.name_en,
+                 item.name_ar,
                  item.brand_en,
                  item.brand_ar,
                  item.short_description_en,
@@ -88,17 +181,17 @@ export const ExistingModificationsReport: React.FC = () => {
                  item.indication_ar,
                  item.how_to_use_en,
                  item.how_to_use_ar,
-                 item.side_effects_en,
-                 item.side_effects_ar,
-                 item.category,
-                 item.group,
-                 item.subgroup,
+                 item.possible_side_effects_en,
+                 item.possible_side_effects_ar,
+                 item.template_category,
+                 item.template_group,
+                 item.template_subgroup,
                  item.tags_filters,
                  item.suggested_filters,
                  item.division,
                  item.department,
-                 item.category_pop,
-                 item.sub_category_pop,
+                 item.category,
+                 item.sub_category,
                  item.class_name
              ];
              
@@ -192,9 +285,9 @@ export const ExistingModificationsReport: React.FC = () => {
                     value={searchQuery}
                     onChange={e => setSearchQuery(e.target.value)}
                  />
-                 {searchQuery && (
-                     <span className="text-xs text-gray-400">Found {filteredData.length} records</span>
-                 )}
+                 <span className="text-xs font-bold text-[#0F3D3E] bg-gray-100 px-3 py-1 rounded-full whitespace-nowrap">
+                    {filteredData.length} / {data.length} Products
+                 </span>
             </div>
 
             <Card className="border-t-4 border-t-[#0F3D3E]">
@@ -208,15 +301,16 @@ export const ExistingModificationsReport: React.FC = () => {
                                 <th className="p-4 text-[10px] font-bold text-[#0F3D3E] uppercase tracking-wider">ERP (SKU)</th>
                                 <th className="p-4 text-[10px] font-bold text-[#0F3D3E] uppercase tracking-wider">Product Name (EN)</th>
                                 <th className="p-4 text-[10px] font-bold text-[#0F3D3E] uppercase tracking-wider">Brand (EN)</th>
+                                <th className="p-4 text-[10px] font-bold text-[#0F3D3E] uppercase tracking-wider">Status</th>
                                 <th className="p-4 text-[10px] font-bold text-[#0F3D3E] uppercase tracking-wider">Images</th>
                                 <th className="p-4 text-[10px] font-bold text-[#0F3D3E] uppercase tracking-wider text-right">Actions</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50">
                             {isLoading ? (
-                                <tr><td colSpan={8} className="p-8 text-center text-gray-400">Loading...</td></tr>
+                                <tr><td colSpan={9} className="p-8 text-center text-gray-400">Loading...</td></tr>
                             ) : filteredData.length === 0 ? (
-                                <tr><td colSpan={8} className="p-8 text-center text-gray-400">No records found.</td></tr>
+                                <tr><td colSpan={9} className="p-8 text-center text-gray-400">No records found.</td></tr>
                             ) : (
                                 filteredData.map(item => (
                                     <tr key={item.id} className="hover:bg-[#F0F4F4]/50 transition-colors text-sm">
@@ -245,16 +339,22 @@ export const ExistingModificationsReport: React.FC = () => {
                                             </div>
                                         </td>
                                         <td className="p-4 font-mono font-bold text-[#0F3D3E]">{item.sku_gtin}</td>
-                                        <td className="p-4 text-gray-600">{item.product_name_en}</td>
+                                        <td className="p-4 text-gray-600">{item.name_en}</td>
                                         <td className="p-4 text-gray-500">{item.brand_en}</td>
+                                        <td className="p-4">
+                                            <span className={`inline-flex items-center rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wider ${getStatusMeta(item.status).chipClass}`}>
+                                                {getStatusMeta(item.status).label}
+                                            </span>
+                                        </td>
                                         <td className="p-4">
                                             <div className="flex items-center gap-1 text-xs bg-gray-100 w-fit px-2 py-1 rounded">
                                                 <ImageIcon size={12} /> {item.image_urls?.length || 0}
                                             </div>
                                         </td>
                                         <td className="p-4 text-right">
-                                            {/* Could add a view details modal later */}
-                                            <span className="text-gray-300 text-xs">View Only via Export</span>
+                                            <Button size="sm" onClick={() => openDetails(item)} className="bg-[#0F3D3E] text-white hover:bg-[#0F3D3E]/90 shadow-sm px-3 py-2 text-xs">
+                                                <Eye size={14} className="mr-1" /> View
+                                            </Button>
                                         </td>
                                     </tr>
                                 ))
@@ -263,6 +363,130 @@ export const ExistingModificationsReport: React.FC = () => {
                     </table>
                 </div>
             </Card>
+
+            <Modal
+                isOpen={!!selectedItem}
+                maxWidth="max-w-6xl"
+                onClose={() => {
+                    setSelectedItem(null);
+                    setDecisionComment('');
+                }}
+                title={selectedItem ? `Review Modification Request: ${selectedItem.sku_gtin}` : 'Review Modification'}
+            >
+                {selectedItem && (
+                    <div className="space-y-6 max-h-[75vh] overflow-y-auto pr-1">
+                        <div className="flex items-start justify-between gap-4 flex-wrap">
+                            <div>
+                                <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">Current Status</p>
+                                <span className={`inline-flex items-center rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wider ${getStatusMeta(selectedItem.status).chipClass}`}>
+                                    {getStatusMeta(selectedItem.status).label}
+                                </span>
+                            </div>
+                            <div className="text-right">
+                                <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">Vendor</p>
+                                <p className="font-bold text-[#0F3D3E]">{selectedItem.vendor?.company_name || 'N/A'}</p>
+                                <p className="text-xs text-gray-500">{selectedItem.vendor?.contact_person_name || 'No Contact'}</p>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="rounded-2xl border border-teal-100 bg-teal-50/30 p-5 shadow-sm">
+                                <p className="text-[11px] font-bold uppercase tracking-widest text-[#0F3D3E] mb-3 flex items-center gap-2">
+                                    <span className="w-2 h-2 rounded-full bg-teal-500"></span> English Details
+                                </p>
+                                <div className="space-y-3 text-sm text-gray-700">
+                                    <div className="bg-white p-2 rounded border border-teal-50"><span className="font-bold text-[#0F3D3E]">Name:</span> {selectedItem.name_en || '-'}</div>
+                                    <div className="bg-white p-2 rounded border border-teal-50"><span className="font-bold text-[#0F3D3E]">Brand:</span> {selectedItem.brand_en || '-'}</div>
+                                    <div className="bg-white p-2 rounded border border-teal-50"><span className="font-bold text-[#0F3D3E]">Short Description:</span> {selectedItem.short_description_en || '-'}</div>
+                                    <div className="bg-white p-2 rounded border border-teal-50"><span className="font-bold text-[#0F3D3E]">Storage:</span> {selectedItem.storage_en || '-'}</div>
+                                    <div className="bg-white p-2 rounded border border-teal-50"><span className="font-bold text-[#0F3D3E]">Composition:</span> {selectedItem.composition_en || '-'}</div>
+                                    <div className="bg-white p-2 rounded border border-teal-50"><span className="font-bold text-[#0F3D3E]">Indication:</span> {selectedItem.indication_en || '-'}</div>
+                                    <div className="bg-white p-2 rounded border border-teal-50"><span className="font-bold text-[#0F3D3E]">How To Use:</span> {selectedItem.how_to_use_en || '-'}</div>
+                                    <div className="bg-white p-2 rounded border border-teal-50"><span className="font-bold text-[#0F3D3E]">Side Effects:</span> {selectedItem.possible_side_effects_en || '-'}</div>
+                                </div>
+                            </div>
+                            <div className="rounded-2xl border border-amber-100 bg-amber-50/30 p-5 shadow-sm">
+                                <p className="text-[11px] font-bold uppercase tracking-widest text-[#C5A065] mb-3 flex items-center gap-2">
+                                    <span className="w-2 h-2 rounded-full bg-amber-500"></span> Arabic Details
+                                </p>
+                                <div className="space-y-3 text-sm text-gray-700" dir="rtl">
+                                    <div className="bg-white p-2 rounded border border-amber-50"><span className="font-bold text-[#C5A065]">الاسم (Name):</span> {selectedItem.name_ar || '-'}</div>
+                                    <div className="bg-white p-2 rounded border border-amber-50"><span className="font-bold text-[#C5A065]">العلامة التجارية (Brand):</span> {selectedItem.brand_ar || '-'}</div>
+                                    <div className="bg-white p-2 rounded border border-amber-50"><span className="font-bold text-[#C5A065]">وصف قصير (Short Description):</span> {selectedItem.short_description_ar || '-'}</div>
+                                    <div className="bg-white p-2 rounded border border-amber-50"><span className="font-bold text-[#C5A065]">التخزين (Storage):</span> {selectedItem.storage_ar || '-'}</div>
+                                    <div className="bg-white p-2 rounded border border-amber-50"><span className="font-bold text-[#C5A065]">التركيب (Composition):</span> {selectedItem.composition_ar || '-'}</div>
+                                    <div className="bg-white p-2 rounded border border-amber-50"><span className="font-bold text-[#C5A065]">دواعي الاستعمال (Indication):</span> {selectedItem.indication_ar || '-'}</div>
+                                    <div className="bg-white p-2 rounded border border-amber-50"><span className="font-bold text-[#C5A065]">طريقة الاستخدام (How To Use):</span> {selectedItem.how_to_use_ar || '-'}</div>
+                                    <div className="bg-white p-2 rounded border border-amber-50"><span className="font-bold text-[#C5A065]">الآثار الجانبية (Side Effects):</span> {selectedItem.possible_side_effects_ar || '-'}</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="rounded-2xl border border-gray-200 p-5 bg-gradient-to-br from-gray-50 to-white shadow-sm">
+                            <p className="text-[11px] font-bold uppercase tracking-widest text-gray-500 mb-4 flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-gray-400"></span> Classification Details
+                            </p>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-700">
+                                <div className="bg-white px-3 py-2 rounded-lg border shadow-sm"><span className="font-bold text-[#0F3D3E] block mb-1">Template Category:</span> {selectedItem.template_category || '-'}</div>
+                                <div className="bg-white px-3 py-2 rounded-lg border shadow-sm"><span className="font-bold text-[#0F3D3E] block mb-1">Template Group:</span> {selectedItem.template_group || '-'}</div>
+                                <div className="bg-white px-3 py-2 rounded-lg border shadow-sm"><span className="font-bold text-[#0F3D3E] block mb-1">Template Subgroup:</span> {selectedItem.template_subgroup || '-'}</div>
+                                <div className="bg-white px-3 py-2 rounded-lg border shadow-sm"><span className="font-bold text-[#0F3D3E] block mb-1">Division:</span> {selectedItem.division || '-'}</div>
+                                <div className="bg-white px-3 py-2 rounded-lg border shadow-sm"><span className="font-bold text-[#0F3D3E] block mb-1">Department:</span> {selectedItem.department || '-'}</div>
+                                <div className="bg-white px-3 py-2 rounded-lg border shadow-sm"><span className="font-bold text-[#0F3D3E] block mb-1">Class:</span> {selectedItem.class_name || '-'}</div>
+                                <div className="bg-white px-3 py-2 rounded-lg border shadow-sm"><span className="font-bold text-[#0F3D3E] block mb-1">Category:</span> {selectedItem.category || '-'}</div>
+                                <div className="bg-white px-3 py-2 rounded-lg border shadow-sm"><span className="font-bold text-[#0F3D3E] block mb-1">Sub-Category:</span> {selectedItem.sub_category || '-'}</div>
+                                <div className="bg-white px-3 py-2 rounded-lg border shadow-sm"><span className="font-bold text-[#0F3D3E] block mb-1">Suggested Filters:</span> {selectedItem.suggested_filters || '-'}</div>
+                            </div>
+                        </div>
+
+                        <div className="rounded-2xl border border-gray-200 p-5 bg-white shadow-sm">
+                            <p className="text-[11px] font-bold uppercase tracking-widest text-[#0F3D3E] mb-4 flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-[#0F3D3E]"></span> Uploaded Images
+                            </p>
+                            {selectedItem.image_urls && selectedItem.image_urls.length > 0 ? (
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                    {selectedItem.image_urls.map((imageUrl, index) => (
+                                        <a key={`${selectedItem.id}-${index}`} href={imageUrl} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-xl border border-gray-200 bg-gray-50 hover:border-[#C5A065] transition-colors">
+                                            <img src={imageUrl} alt={`${selectedItem.sku_gtin} ${index + 1}`} className="h-36 w-full object-cover" />
+                                        </a>
+                                    ))}
+                                </div>
+                            ) : (
+                                <p className="text-sm text-gray-400 italic">No images uploaded.</p>
+                            )}
+                        </div>
+
+                        <div className="rounded-xl border border-gray-200 p-4 bg-[#F8FAFA]">
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-[#0F3D3E] mb-2">Admin Comment <span className="text-red-500">*</span></p>
+                            <textarea
+                                value={decisionComment}
+                                onChange={e => setDecisionComment(e.target.value)}
+                                placeholder="Add notes for the vendor (mandatory for approval and revision requests)..."
+                                className="w-full min-h-28 rounded-xl border border-gray-200 p-4 text-sm text-[#0F3D3E] outline-none focus:border-[#C5A065] focus:ring-4 focus:ring-[#C5A065]/10"
+                                required
+                            />
+                            <p className="mt-2 text-xs text-gray-500">This comment will be emailed to the vendor and visible in their submission history.</p>
+                        </div>
+
+                        <div className="flex flex-col md:flex-row justify-end gap-3 pt-2 border-t mt-4">
+                            <Button
+                                onClick={() => handleDecision('approved')}
+                                disabled={isSavingDecision}
+                                className="h-11 px-6 !bg-none !bg-green-600 hover:!bg-green-700 !border-green-600 text-white font-bold transition-colors"
+                            >
+                                <CheckCircle2 size={18} className="mr-2" /> Approve
+                            </Button>
+                            <Button
+                                onClick={() => handleDecision('revision_required')}
+                                disabled={isSavingDecision}
+                                className="h-11 px-6 !bg-none !bg-orange-500 hover:!bg-orange-600 !border-orange-500 text-white font-bold transition-colors"
+                            >
+                                <RotateCcw size={18} className="mr-2" /> Revision Request
+                            </Button>
+                        </div>
+                    </div>
+                )}
+            </Modal>
         </div>
     );
 };

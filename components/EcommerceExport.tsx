@@ -33,10 +33,14 @@ export const EcommerceExport: React.FC = () => {
             // Fetch all requests
             const allRequests = await db.fetchRequests();
             // Filter: Completed OR Approved Pending ERP OR In Review (for visibility)
+            // Added: 'approved_pending_ecommerce', 'partially_approved' to ensure full visibility as requested
             const relevantReqs = allRequests.filter(r => 
                 r.status === 'completed' || 
                 r.status === 'approved_pending_erp' ||
-                r.status === 'in_review'
+                r.status === 'approved_pending_ecommerce' ||
+                r.status === 'partially_approved' ||
+                r.status === 'in_review' ||
+                r.status === 'rejected'
             );
             const validReqIds = relevantReqs.map(r => r.id);
             
@@ -86,6 +90,10 @@ export const EcommerceExport: React.FC = () => {
         
         if (p.request_status === 'approved_pending_erp') return <span className="text-purple-600 font-bold">Waiting for ERP Code</span>;
         
+        if (p.request_status === 'approved_pending_ecommerce' || p.request_status === 'partially_approved') {
+             return <span className="text-emerald-600 font-bold">Approved / Pending Master Sync</span>;
+        }
+
         if (p.request_status === 'in_review' && p.current_step) {
             const step = MOCK_STEPS.find(s => s.step_number === p.current_step);
             const roleName = step?.role_required ? (ROLE_LABELS[step.role_required] || step.role_required) : 'Unknown';
@@ -133,7 +141,16 @@ export const EcommerceExport: React.FC = () => {
             const row = new Array(headers.length).fill('');
             row[0] = item.request_number;
             row[1] = item.request_status;
-            row[2] = item.erp_item_code || 'PENDING';
+            
+            // Item Code Status Logic
+            if (item.request_status === 'rejected') {
+                row[2] = 'Rejected';
+            } else if (!item.erp_item_code || item.erp_item_code === 'N/A') {
+                row[2] = 'PENDING';
+            } else {
+                row[2] = item.erp_item_code;
+            }
+
             row[3] = item.product_name;
             row[4] = item.product_name_ar;
             row[5] = item.brand;
@@ -398,7 +415,11 @@ export const EcommerceExport: React.FC = () => {
                                      filteredProducts.map(p => (
                                          <tr key={p.id} className="hover:bg-[#F0F4F4]/50">
                                              <td className="p-4 font-black text-xs text-[#0F3D3E]">{p.request_number}</td>
-                                             <td className="p-4 font-mono font-bold text-xs">{p.erp_item_code || <span className="text-amber-500">Pending</span>}</td>
+                                             <td className="p-4 font-mono font-bold text-xs">{
+                                                p.status === 'rejected' || p.request_status === 'rejected' 
+                                                ? <span className="text-red-500">Rejected</span> 
+                                                : (p.erp_item_code || <span className="text-amber-500">Pending</span>)
+                                             }</td>
                                              <td className="p-4 text-xs font-bold text-gray-500 whitespace-nowrap">{p.division}</td>
                                              <td className="p-4 font-medium text-[#0F3D3E]">
                                                  {p.product_name}

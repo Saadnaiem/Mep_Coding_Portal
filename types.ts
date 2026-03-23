@@ -1,7 +1,7 @@
 
 export type UserType = 'vendor' | 'employee' | 'admin';
 export type RequestType = 'new_vendor' | 'new_products';
-export type RequestStatus = 'draft' | 'submitted' | 'in_review' | 'vendor_revision_required' | 'rejected' | 'approved_pending_erp' | 'completed' | 'partially_approved';
+export type RequestStatus = 'draft' | 'submitted' | 'in_review' | 'vendor_revision_required' | 'rejected' | 'approved_pending_erp' | 'approved_pending_ecommerce' | 'completed' | 'partially_approved';
 export type RequestPriority = 'normal' | 'urgent';
 export type EmployeeRole = 
   | 'category_manager' 
@@ -119,6 +119,8 @@ export interface ProductRequest {
   last_action_at: string;
   created_at: string;
   vendor?: Vendor;
+  erp_reviewer_name?: string;
+  e_commerce_reviewer_name?: string;
 }
 
 export interface Product {
@@ -199,8 +201,8 @@ export interface ExistingProductModification {
     created_at: string;
     vendor_id: string;
     sku_gtin: string;
-    product_name_en: string;
-    product_name_ar: string;
+    name_en: string;
+    name_ar: string;
     brand_en: string;
     brand_ar: string;
     short_description_en?: string;
@@ -213,20 +215,25 @@ export interface ExistingProductModification {
     indication_ar?: string;
     how_to_use_en?: string;
     how_to_use_ar?: string;
-    side_effects_en?: string;
-    side_effects_ar?: string;
+    possible_side_effects_en?: string;
+    possible_side_effects_ar?: string;
     category?: string;
-    group?: string;
-    subgroup?: string;
+    // group?: string; // Removed - not in DB
+    // subgroup?: string; // Removed - not in DB
+    template_category?: string;
+    template_group?: string;
+    template_subgroup?: string;
     tags_filters?: string;
     suggested_filters?: string;
     division?: string;
     department?: string;
     category_pop?: string;
     sub_category_pop?: string;
+    sub_category?: string;
     class_name?: string;
     image_urls?: string[];
     status?: string;
+    rejection_reason?: string;
     // Joined
     vendor?: Vendor;
 }

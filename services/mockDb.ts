@@ -11,7 +11,8 @@ export const MOCK_STEPS: RequestStep[] = [
   { step_number: 4, step_name: 'Planning Executive Director Approval', role_required: 'planning_executive_director', sla_hours: 24 },
   { step_number: 5, step_name: 'Commercial and BD Exec Director', role_required: 'commercial_business_development_executive_director', sla_hours: 48 },
   { step_number: 6, step_name: 'General Director Approval', role_required: 'general_director', sla_hours: 48 },
-  { step_number: 7, step_name: 'ERP Code Issuance', role_required: 'planning_erp_creation', sla_hours: 24 }
+  { step_number: 7, step_name: 'ERP Code Issuance', role_required: 'planning_erp_creation', sla_hours: 24 },
+  { step_number: 8, step_name: 'E_Commerce Approval', role_required: 'e_commerce_admin', sla_hours: 24 }
 ];
 
 // Re-export empty arrays for legacy support if needed, but ideally unused
