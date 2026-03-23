@@ -389,7 +389,15 @@ export const ExistingProductModification: React.FC<ExistingProductModificationPr
         const headerRow = worksheet.addRow(headers);
         headerRow.font = { bold: true };
         
-        history.forEach(item => {
+        history.filter(item => item.status !== 'pending_vendor').forEach(item => {
+             // Safe parse images
+             let customImages = [];
+             if (Array.isArray(item.image_urls)) {
+                 customImages = item.image_urls;
+             } else if (typeof item.image_urls === 'string') {
+                 try { customImages = JSON.parse(item.image_urls); } catch(e){}
+             }
+
              const row = [
                  item.sku_gtin,
                  item.product_name_en,
@@ -421,14 +429,14 @@ export const ExistingProductModification: React.FC<ExistingProductModificationPr
              ];
              
              // Images
-             const images = item.image_urls || [];
+             
              const imageSlots = new Array(6).fill('');
              const meta = [new Date(item.created_at).toLocaleDateString()];
 
-             const fullRowData = [...row, ...imageSlots, ...meta];
+             const fullRowData = [...row.map(val => (val === null || val === undefined) ? '' : String(val)), ...imageSlots, ...meta];
              const newRow = worksheet.addRow(fullRowData);
 
-             images.forEach((img: string, idx: number) => {
+             customImages.forEach((img: string, idx: number) => {
                  if (idx < 6) {
                     try {
                          // Data columns end at 27 (0-26). Image 1 is 27 (28th column). Actually headers[27] is Image 1.
@@ -686,14 +694,14 @@ const handleFileChange = (index: number, e: React.ChangeEvent<HTMLInputElement>)
                     <h2 className="text-2xl font-serif font-bold text-[#0F3D3E]">Existing Products Modification</h2>
                     <p className="text-gray-500 text-sm">Update data for products already listed.</p>
                 </div>
-                <Button variant="outline" onClick={onCancel}>
+                <Button className="bg-[#107c41] text-white hover:bg-[#0c5b2f]" onClick={onCancel}>
                     <ArrowLeft size={16} className="mr-2" /> Back to Dashboard
                 </Button>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
                 {/* Form Section */}
-                <div className="lg:col-span-2 space-y-6">
+                <div className="lg:col-span-3 space-y-6">
 
                     {/* Assigned Items Section */}
                     {assignedItems.length > 0 && (
@@ -941,7 +949,7 @@ const handleFileChange = (index: number, e: React.ChangeEvent<HTMLInputElement>)
                             <h3 className="font-bold text-[#0F3D3E] flex items-center gap-2">
                                 <Save size={18} /> Submission History
                             </h3>
-                            <Button variant="outline" size="sm" onClick={handleExportHistory} title="Export to Excel">
+                            <Button size="sm" onClick={handleExportHistory} title="Export to Excel" className="bg-[#107c41] text-white hover:bg-[#0c5b2f]">
                                 <Download size={14} />
                             </Button>
                          </div>
@@ -1040,6 +1048,10 @@ const handleFileChange = (index: number, e: React.ChangeEvent<HTMLInputElement>)
         </div>
     );
 };
+
+
+
+
 
 
 
