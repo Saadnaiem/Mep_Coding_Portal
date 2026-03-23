@@ -51,7 +51,9 @@ export const ItemMasterAssignment = ({ user, onClose }: { user: any, onClose: ()
         }
     };
 
-    const fetchItems = async (page = currentPage) => {
+    const fetchItems = async (page = currentPage, overrides?: { dateFrom?: string, dateTo?: string }) => {
+        const effDateFrom = overrides && overrides.dateFrom !== undefined ? overrides.dateFrom : dateFrom;
+        const effDateTo = overrides && overrides.dateTo !== undefined ? overrides.dateTo : dateTo;
         setLoading(true);
         // Request count alongside the data
         let query = supabase.from('item_master').select('*', { count: 'exact' })
@@ -67,12 +69,12 @@ export const ItemMasterAssignment = ({ user, onClose }: { user: any, onClose: ()
         if (selectedBrand) {
             query = query.ilike('brand', `%${selectedBrand}%`);
         }
-        if (dateFrom) {
-            query = query.gte('created_at', new Date(dateFrom).toISOString());
+        if (effDateFrom) {
+            query = query.gte('created_at', new Date(effDateFrom).toISOString());
         }
-        if (dateTo) {
+        if (effDateTo) {
             // Include the whole day by setting time to 23:59:59
-            const toDate = new Date(dateTo);
+            const toDate = new Date(effDateTo);
             toDate.setHours(23, 59, 59, 999);
             query = query.lte('created_at', toDate.toISOString());
         }
@@ -91,9 +93,9 @@ export const ItemMasterAssignment = ({ user, onClose }: { user: any, onClose: ()
             if (selectedDivision) newCountQuery = newCountQuery.eq('division', selectedDivision);
             if (selectedBrand) newCountQuery = newCountQuery.ilike('brand', `%${selectedBrand}%`);
             // The "Date Added" visual filter also limits new items visibility if requested
-            if (dateFrom) newCountQuery = newCountQuery.gte('created_at', new Date(dateFrom) > new Date('2026-03-21T00:00:00Z') ? new Date(dateFrom).toISOString() : '2026-03-21T00:00:00Z');
-            if (dateTo) {
-                const toD = new Date(dateTo);
+            if (effDateFrom) newCountQuery = newCountQuery.gte('created_at', new Date(effDateFrom) > new Date('2026-03-21T00:00:00Z') ? new Date(effDateFrom).toISOString() : '2026-03-21T00:00:00Z');
+            if (effDateTo) {
+                const toD = new Date(effDateTo);
                 toD.setHours(23, 59, 59, 999);
                 newCountQuery = newCountQuery.lte('created_at', toD.toISOString());
             }
@@ -108,6 +110,13 @@ export const ItemMasterAssignment = ({ user, onClose }: { user: any, onClose: ()
     const handleFilter = () => {
         setCurrentPage(1);
         fetchItems(1);
+    };
+
+    const handleShowNewItems = () => {
+        setDateFrom('2026-03-21');
+        setDateTo('');
+        setCurrentPage(1);
+        fetchItems(1, { dateFrom: '2026-03-21', dateTo: '' });
     };
 
     const toggleSelection = (code: string) => {
@@ -383,7 +392,9 @@ export const ItemMasterAssignment = ({ user, onClose }: { user: any, onClose: ()
                  
                  <div className="ml-auto flex flex-col items-end justify-center gap-1">
                      <div className="flex gap-4 items-center mb-[2px]">
-                         <div className="bg-emerald-50 px-4 py-2.5 rounded-xl border border-emerald-100 flex items-center gap-2 shadow-sm animate-in fade-in">
+                         <div 
+                            onClick={handleShowNewItems}
+                            className="bg-emerald-50 hover:bg-emerald-100 cursor-pointer px-4 py-2.5 rounded-xl border border-emerald-200 flex items-center gap-2 shadow-sm transition-colors animate-in fade-in">
                              <span className="text-emerald-800 font-bold text-sm tracking-wide">New Items Added</span>
                              <span className="bg-emerald-500 text-white font-black px-3 py-1 rounded-full text-sm shadow-inner min-w-[2.5rem] text-center">{newItemsCount.toLocaleString()}</span>
                          </div>
