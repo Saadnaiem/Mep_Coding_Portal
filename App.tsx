@@ -5544,6 +5544,99 @@ const App: React.FC = () => {
                 </div>
               </Card>
 
+
+
+              {/* Action Buttons only for actionable users */}
+              {isRequestActionable && (
+                <Card
+                  title="Review Actions"
+                  className="bg-[#0F3D3E] text-white border-none shadow-xl shadow-[#0F3D3E]/30"
+                >
+                  <div className="space-y-4 pt-2">
+                    <div className="bg-white/10 p-4 rounded-lg mb-4 text-sm font-light">
+                      <p className="mb-2 font-bold text-[#C5A065]">
+                        Review Summary:
+                      </p>
+                      <ul className="list-disc list-inside space-y-1 text-xs">
+                        <li>
+                          <span className="text-emerald-400 font-bold">
+                            Approved:
+                          </span>{" "}
+                          {
+                            products.filter(p => p.request_id === currentRequest?.id).filter((p) => p.status === "approved")
+                              .length
+                          }
+                        </li>
+                        <li>
+                          <span className="text-amber-400 font-bold">
+                            Revision:
+                          </span>{" "}
+                          {
+                            products.filter(p => p.request_id === currentRequest?.id).filter(
+                              (p) => p.status === "revision_required",
+                            ).length
+                          }
+                        </li>
+                        <li>
+                          <span className="text-red-400 font-bold">
+                            Rejected:
+                          </span>{" "}
+                          {
+                            products.filter(p => p.request_id === currentRequest?.id).filter((p) => p.status === "rejected")
+                              .length
+                          }
+                        </li>
+                        <li>
+                          <span className="text-gray-400 font-bold">
+                            Pending:
+                          </span>{" "}
+                          {
+                            products.filter(p => p.request_id === currentRequest?.id).filter(
+                              (p) => !p.status || p.status === "pending",
+                            ).length
+                          }
+                        </li>
+                      </ul>
+                    </div>
+                    <Button
+                      className="w-full h-14 bg-white text-[#0F3D3E] hover:bg-[#C5A065] hover:text-white border-none rounded-xl font-bold uppercase tracking-widest transition-colors duration-300"
+                      onClick={() => {
+                        // Determine action automatically based on products
+                        const pendingCount = products.filter(p => p.request_id === currentRequest?.id).filter(
+                          (p) => !p.status || p.status === "pending",
+                        ).length;
+                        if (pendingCount > 0) {
+                          alert(
+                            `Please set a status for all products before submitting. (${pendingCount} pending)`,
+                          );
+                          return;
+                        }
+
+                        const hasRevision = products.filter(p => p.request_id === currentRequest?.id).some(
+                          (p) => p.status === "revision_required",
+                        );
+                        const allRejected = products.filter(p => p.request_id === currentRequest?.id).every(
+                          (p) => p.status === "rejected",
+                        );
+
+                        // If any item needs revision, the whole request goes back for revision
+                        // If all items are rejected, the request is rejected
+                        // Otherwise (all approved, or mix of approved/rejected), we proceed
+                        const derivedAction = hasRevision
+                          ? "return"
+                          : allRejected
+                            ? "reject"
+                            : "approve";
+
+                        setActionType(derivedAction);
+                        setIsActionModalOpen(true);
+                      }}
+                    >
+                      Submit Decision
+                    </Button>
+                  </div>
+                </Card>
+              )}
               {/* Vendor Documents Card - Visible to all Staff and Vendors */}
               {currentRequest?.vendor && (
                 <>
@@ -5770,98 +5863,6 @@ const App: React.FC = () => {
                   ))}
                 </div>
               </Card>
-
-              {/* Action Buttons only for actionable users */}
-              {isRequestActionable && (
-                <Card
-                  title="Review Actions"
-                  className="bg-[#0F3D3E] text-white border-none shadow-xl shadow-[#0F3D3E]/30"
-                >
-                  <div className="space-y-4 pt-2">
-                    <div className="bg-white/10 p-4 rounded-lg mb-4 text-sm font-light">
-                      <p className="mb-2 font-bold text-[#C5A065]">
-                        Review Summary:
-                      </p>
-                      <ul className="list-disc list-inside space-y-1 text-xs">
-                        <li>
-                          <span className="text-emerald-400 font-bold">
-                            Approved:
-                          </span>{" "}
-                          {
-                            products.filter(p => p.request_id === currentRequest?.id).filter((p) => p.status === "approved")
-                              .length
-                          }
-                        </li>
-                        <li>
-                          <span className="text-amber-400 font-bold">
-                            Revision:
-                          </span>{" "}
-                          {
-                            products.filter(p => p.request_id === currentRequest?.id).filter(
-                              (p) => p.status === "revision_required",
-                            ).length
-                          }
-                        </li>
-                        <li>
-                          <span className="text-red-400 font-bold">
-                            Rejected:
-                          </span>{" "}
-                          {
-                            products.filter(p => p.request_id === currentRequest?.id).filter((p) => p.status === "rejected")
-                              .length
-                          }
-                        </li>
-                        <li>
-                          <span className="text-gray-400 font-bold">
-                            Pending:
-                          </span>{" "}
-                          {
-                            products.filter(p => p.request_id === currentRequest?.id).filter(
-                              (p) => !p.status || p.status === "pending",
-                            ).length
-                          }
-                        </li>
-                      </ul>
-                    </div>
-                    <Button
-                      className="w-full h-14 bg-white text-[#0F3D3E] hover:bg-[#C5A065] hover:text-white border-none rounded-xl font-bold uppercase tracking-widest transition-colors duration-300"
-                      onClick={() => {
-                        // Determine action automatically based on products
-                        const pendingCount = products.filter(p => p.request_id === currentRequest?.id).filter(
-                          (p) => !p.status || p.status === "pending",
-                        ).length;
-                        if (pendingCount > 0) {
-                          alert(
-                            `Please set a status for all products before submitting. (${pendingCount} pending)`,
-                          );
-                          return;
-                        }
-
-                        const hasRevision = products.filter(p => p.request_id === currentRequest?.id).some(
-                          (p) => p.status === "revision_required",
-                        );
-                        const allRejected = products.filter(p => p.request_id === currentRequest?.id).every(
-                          (p) => p.status === "rejected",
-                        );
-
-                        // If any item needs revision, the whole request goes back for revision
-                        // If all items are rejected, the request is rejected
-                        // Otherwise (all approved, or mix of approved/rejected), we proceed
-                        const derivedAction = hasRevision
-                          ? "return"
-                          : allRejected
-                            ? "reject"
-                            : "approve";
-
-                        setActionType(derivedAction);
-                        setIsActionModalOpen(true);
-                      }}
-                    >
-                      Submit Decision
-                    </Button>
-                  </div>
-                </Card>
-              )}
             </div>
           </div>
         </Card>
