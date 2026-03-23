@@ -114,7 +114,7 @@ export const ExistingProductModification: React.FC<ExistingProductModificationPr
     const loadHistory = async () => {
         const data = await db.fetchExistingModifications();
         if (vendorId) {
-             setHistory(data);
+             setHistory(data.filter((item: any) => item.vendor_id === vendorId));
         }
     };
 
@@ -1048,6 +1048,7 @@ const handleFileChange = (index: number, e: React.ChangeEvent<HTMLInputElement>)
         </div>
     );
 };
+
 
 
 
