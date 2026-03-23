@@ -86,12 +86,12 @@ export const ItemMasterAssignment = ({ user, onClose }: { user: any, onClose: ()
             
             // New items are explicitly those added from March 22, 2026 onwards
             let newCountQuery = supabase.from('item_master').select('*', { count: 'exact', head: true })
-                .gte('created_at', '2026-03-22T00:00:00Z');
+                .gte('created_at', '2026-03-21T00:00:00Z');
                 
             if (selectedDivision) newCountQuery = newCountQuery.eq('division', selectedDivision);
             if (selectedBrand) newCountQuery = newCountQuery.ilike('brand', `%${selectedBrand}%`);
             // The "Date Added" visual filter also limits new items visibility if requested
-            if (dateFrom) newCountQuery = newCountQuery.gte('created_at', new Date(dateFrom) > new Date('2026-03-22T00:00:00Z') ? new Date(dateFrom).toISOString() : '2026-03-22T00:00:00Z');
+            if (dateFrom) newCountQuery = newCountQuery.gte('created_at', new Date(dateFrom) > new Date('2026-03-21T00:00:00Z') ? new Date(dateFrom).toISOString() : '2026-03-21T00:00:00Z');
             if (dateTo) {
                 const toD = new Date(dateTo);
                 toD.setHours(23, 59, 59, 999);
