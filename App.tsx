@@ -5546,6 +5546,7 @@ const App: React.FC = () => {
 
 
 
+
               {/* Action Buttons only for actionable users */}
               {isRequestActionable && (
                 <Card
@@ -5557,46 +5558,54 @@ const App: React.FC = () => {
                       <p className="mb-2 font-bold text-[#C5A065]">
                         Review Summary:
                       </p>
-                      <ul className="list-disc list-inside space-y-1 text-xs">
-                        <li>
-                          <span className="text-emerald-400 font-bold">
+                      <div className="flex flex-wrap items-center gap-4 sm:gap-6 text-xs w-full mt-2">
+                        <div className="flex items-center gap-2 bg-black/20 px-3 py-1.5 rounded-lg border border-white/5">
+                          <span className="text-emerald-400 font-bold tracking-wider">
                             Approved:
-                          </span>{" "}
-                          {
-                            products.filter(p => p.request_id === currentRequest?.id).filter((p) => p.status === "approved")
-                              .length
-                          }
-                        </li>
-                        <li>
-                          <span className="text-amber-400 font-bold">
+                          </span>
+                          <span className="text-white font-black text-sm">
+                            {
+                              products.filter(p => p.request_id === currentRequest?.id).filter((p) => p.status === "approved")
+                                .length
+                            }
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 bg-black/20 px-3 py-1.5 rounded-lg border border-white/5">
+                          <span className="text-amber-400 font-bold tracking-wider">
                             Revision:
-                          </span>{" "}
-                          {
-                            products.filter(p => p.request_id === currentRequest?.id).filter(
-                              (p) => p.status === "revision_required",
-                            ).length
-                          }
-                        </li>
-                        <li>
-                          <span className="text-red-400 font-bold">
+                          </span>
+                          <span className="text-white font-black text-sm">
+                            {
+                              products.filter(p => p.request_id === currentRequest?.id).filter(
+                                (p) => p.status === "revision_required",
+                              ).length
+                            }
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 bg-black/20 px-3 py-1.5 rounded-lg border border-white/5">
+                          <span className="text-red-400 font-bold tracking-wider">
                             Rejected:
-                          </span>{" "}
-                          {
-                            products.filter(p => p.request_id === currentRequest?.id).filter((p) => p.status === "rejected")
-                              .length
-                          }
-                        </li>
-                        <li>
-                          <span className="text-gray-400 font-bold">
+                          </span>
+                          <span className="text-white font-black text-sm">
+                            {
+                              products.filter(p => p.request_id === currentRequest?.id).filter((p) => p.status === "rejected")
+                                .length
+                            }
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 bg-black/20 px-3 py-1.5 rounded-lg border border-white/5">
+                          <span className="text-gray-400 font-bold tracking-wider">
                             Pending:
-                          </span>{" "}
-                          {
-                            products.filter(p => p.request_id === currentRequest?.id).filter(
-                              (p) => !p.status || p.status === "pending",
-                            ).length
-                          }
-                        </li>
-                      </ul>
+                          </span>
+                          <span className="text-white font-black text-sm">
+                            {
+                              products.filter(p => p.request_id === currentRequest?.id).filter(
+                                (p) => !p.status || p.status === "pending",
+                              ).length
+                            }
+                          </span>
+                        </div>
+                      </div>
                     </div>
                     <Button
                       className="w-full h-14 bg-white text-[#0F3D3E] hover:bg-[#C5A065] hover:text-white border-none rounded-xl font-bold uppercase tracking-widest transition-colors duration-300"
