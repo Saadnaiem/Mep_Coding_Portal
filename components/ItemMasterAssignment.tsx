@@ -119,6 +119,13 @@ export const ItemMasterAssignment = ({ user, onClose }: { user: any, onClose: ()
         fetchItems(1, { dateFrom: '2026-03-21', dateTo: '' });
     };
 
+    const handleShowAllItems = () => {
+        setDateFrom('');
+        setDateTo('');
+        setCurrentPage(1);
+        fetchItems(1, { dateFrom: '', dateTo: '' });
+    };
+
     const toggleSelection = (code: string) => {
         if (selectedItems.includes(code)) {
             setSelectedItems(prev => prev.filter(i => i !== code));
@@ -398,8 +405,10 @@ export const ItemMasterAssignment = ({ user, onClose }: { user: any, onClose: ()
                              <span className="text-emerald-800 font-bold text-sm tracking-wide">New Items Added</span>
                              <span className="bg-emerald-500 text-white font-black px-3 py-1 rounded-full text-sm shadow-inner min-w-[2.5rem] text-center">{newItemsCount.toLocaleString()}</span>
                          </div>
-                         <div className="bg-[#0F3D3E]/5 px-4 py-2.5 rounded-xl border border-[#0F3D3E]/10 flex items-center gap-2 shadow-sm">
-                             <span className="text-[#0F3D3E] font-bold text-sm tracking-wide">Total Products</span>
+                         <div 
+                            onClick={handleShowAllItems}
+                            className="bg-[#0F3D3E]/5 hover:bg-[#0F3D3E]/10 cursor-pointer transition-colors px-4 py-2.5 rounded-xl border border-[#0F3D3E]/20 flex items-center gap-2 shadow-sm">
+                               <span className="text-[#0F3D3E] font-bold text-sm tracking-wide">Total Products</span>
                              <span className="bg-[#C5A065] text-white font-black px-3 py-1 rounded-full text-sm shadow-inner min-w-[3rem] text-center">{totalItemsCount.toLocaleString()}</span>
                          </div>
                      </div>
