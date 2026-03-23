@@ -461,4 +461,36 @@ class DatabaseService {
 }
 
 
+
+  // --- Item Master Sync ---
+  async syncToItemMaster(products: import('./types').Product[]): Promise<boolean> {
+    if (!products || products.length === 0) return true;
+
+    // Filter only approved products
+    const approvedProducts = products.filter(p => p.status === 'approved');
+    if (approvedProducts.length === 0) return true;
+
+    const itemsToInsert = approvedProducts.map(p => ({
+      erp_item_code: p.erp_item_code || ('TEMP-' + p.id), // Needs an ERP code, use temp if missing
+      item_description: p.item_description || p.product_name,
+      division: p.division,
+      department: p.department,
+      category: p.category,
+      sub_category: p.sub_category,
+      class_name: p.class_name,
+      brand: p.brand,
+      status: 'active'
+    }));
+
+    const { error } = await supabase
+      .from('item_master')
+      .upsert(itemsToInsert, { onConflict: 'erp_item_code' });
+
+    if (error) {
+      console.error('Error syncing to item_master:', error);
+      return false;
+    }
+    return true;
+  }
+
 export const db = new DatabaseService();

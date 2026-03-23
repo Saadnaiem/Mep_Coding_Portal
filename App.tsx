@@ -1163,6 +1163,12 @@ const App: React.FC = () => {
 
     await db.logAction(newActionPayload);
 
+    // Sync to Item Master if totally completed
+    if (nextStatus === "completed") {
+      const allReqProducts = products.filter(p => p.request_id === currentRequest.id);
+      await db.syncToItemMaster(allReqProducts);
+    }
+
     // --- NOTIFICATION LOGIC ---
     // Calculate Summary
     const reqProducts = products.filter(
