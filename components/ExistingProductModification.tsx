@@ -272,7 +272,7 @@ export const ExistingProductModification: React.FC<ExistingProductModificationPr
 
         worksheet.getRow(1).font = { bold: true };
         const buffer = await workbook.xlsx.writeBuffer();
-        saveAs(new Blob([buffer]), `Assigned_Updates_${new Date().toISOString().split('T')[0]}.xlsx`);
+        saveAs(new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), `Assigned_Updates_${new Date().toISOString().split('T')[0]}.xlsx`);
     };
 
     const handleImportAssigned = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -465,7 +465,7 @@ export const ExistingProductModification: React.FC<ExistingProductModificationPr
         });
         
         const buffer = await workbook.xlsx.writeBuffer();
-        saveAs(new Blob([buffer]), `My_Existing_Product_Mods_${new Date().toISOString().split('T')[0]}.xlsx`);
+        saveAs(new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), `My_Existing_Product_Mods_${new Date().toISOString().split('T')[0]}.xlsx`);
     };
 
     const handleChange = (field: keyof ExistingProductModificationType, value: string) => {
