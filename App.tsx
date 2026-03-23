@@ -4814,7 +4814,7 @@ const App: React.FC = () => {
                                       };
 
                                       let statusColor =
-                                        "bg-orange-50 text-orange-700"; // Pending
+                                        "bg-orange-100 text-orange-800"; // Pending
                                       if (status === "approved")
                                         statusColor =
                                           "bg-green-50 text-green-700";
@@ -4822,7 +4822,7 @@ const App: React.FC = () => {
                                         statusColor = "bg-red-50 text-red-700";
                                       else if (status === "revision_required")
                                         statusColor =
-                                          "bg-amber-100 text-amber-800";
+                                          "bg-yellow-100 text-yellow-800";
 
                                       return (
                                         <span
@@ -5413,6 +5413,7 @@ const App: React.FC = () => {
                                             [
                                               "approved",
                                               "revision_required",
+                                              "pending",
                                               "rejected",
                                             ] as const
                                           ).map((option) => (
@@ -5421,13 +5422,15 @@ const App: React.FC = () => {
                                               className={`
                                                       flex items-center gap-2 px-4 py-3 rounded-xl border-2 cursor-pointer transition-all flex-1 justify-center
                                                       ${
-                                                        p.status === option
+                                                        p.status === option || (option === "pending" && !p.status)
                                                           ? option ===
                                                             "approved"
                                                             ? "bg-emerald-50 border-emerald-600"
                                                             : option ===
                                                                 "revision_required"
-                                                              ? "bg-amber-50 border-amber-600"
+                                                              ? "bg-yellow-50 border-yellow-500"
+                                                              : option === "pending"
+                                                                ? "bg-orange-50 border-orange-500"
                                                               : "bg-red-50 border-red-600"
                                                           : "border-gray-200 hover:border-[#0F3D3E]"
                                                       }
@@ -5436,7 +5439,7 @@ const App: React.FC = () => {
                                               <input
                                                 type="radio"
                                                 name={`status-${p.id}`}
-                                                checked={p.status === option}
+                                                checked={p.status === option || (option === "pending" && !p.status)}
                                                 onChange={() => {
                                                   if (isRequestActionable) {
                                                     // Optimistic update
@@ -5486,7 +5489,9 @@ const App: React.FC = () => {
                                                     ? "accent-emerald-600"
                                                     : option ===
                                                         "revision_required"
-                                                      ? "accent-amber-600"
+                                                      ? "accent-yellow-500"
+                                                      : option === "pending"
+                                                        ? "accent-orange-500"
                                                       : "accent-red-600"
                                                 }`}
                                                 disabled={!isRequestActionable}
@@ -5494,12 +5499,15 @@ const App: React.FC = () => {
                                               <span
                                                 className={`font-bold uppercase text-xs tracking-wider
                                                            ${option === "approved" ? "text-emerald-800" : ""}
-                                                           ${option === "revision_required" ? "text-amber-800" : ""}
+                                                           ${option === "revision_required" ? "text-yellow-700" : ""}
+                                                           ${option === "pending" ? "text-orange-700" : ""}
                                                            ${option === "rejected" ? "text-red-800" : ""}
                                                        `}
                                               >
                                                 {option === "revision_required"
                                                   ? "Revision"
+                                                  : option === "pending"
+                                                  ? "Pending"
                                                   : option}
                                               </span>
                                             </label>
