@@ -1163,8 +1163,8 @@ const App: React.FC = () => {
 
     await db.logAction(newActionPayload);
 
-    // Sync to Item Master if totally completed
-    if (nextStatus === "completed") {
+    // Sync to Item Master for approved items when the request finishes
+    if (nextStatus === "completed" || nextStatus === "partially_approved") {
       const allReqProducts = products.filter(p => p.request_id === currentRequest.id);
       await db.syncToItemMaster(allReqProducts);
     }
