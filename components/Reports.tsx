@@ -398,7 +398,7 @@ export const Reports: React.FC = () => {
                             
                             const extMatch = img.match(/\.([a-zA-Z0-9]+)(\?|$)/);
                             const ext = extMatch ? extMatch[1] : 'jpg';
-                            const suffix = idx === 0 ? '' : `_${idx + 1}`;
+                            const suffix = idx === 0 ? '' : `#${idx}`;
                             const fileName = `${item.item_code}${suffix}.${ext}`;
                             
                             const separator = img.includes('?') ? '&' : '?';

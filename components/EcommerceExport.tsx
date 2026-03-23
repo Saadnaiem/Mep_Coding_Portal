@@ -172,7 +172,7 @@ export const EcommerceExport: React.FC = () => {
                             const extMatch = img.match(/\.([a-zA-Z0-9]+)(\?|$)/);
                             const ext = extMatch ? extMatch[1] : 'jpg';
                             const filePrefix = item.erp_item_code || item.request_number || 'product';
-                            const suffix = idx === 0 ? '' : `_${idx + 1}`;
+                            const suffix = idx === 0 ? '' : `#${idx}`;
                             const fileName = `${filePrefix}${suffix}.${ext}`;
                             
                             const separator = img.includes('?') ? '&' : '?';
@@ -280,7 +280,7 @@ export const EcommerceExport: React.FC = () => {
                              
                              const extMatch = img.match(/\.([a-zA-Z0-9]+)(\?|$)/);
                              const ext = extMatch ? extMatch[1] : 'jpg';
-                             const suffix = idx === 0 ? '' : `_${idx + 1}`;
+                             const suffix = idx === 0 ? '' : `#${idx}`;
                              const fileName = `${item.erp_item_code}${suffix}.${ext}`;
                              
                              const separator = img.includes('?') ? '&' : '?';

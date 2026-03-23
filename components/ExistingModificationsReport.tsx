@@ -226,7 +226,7 @@ export const ExistingModificationsReport: React.FC = () => {
                          // Naming convention:
                          // First image (idx=0) -> force name to ERP.png
                          // Following images -> ERP_2.png, ERP_3.png, etc.
-                         const suffix = idx === 0 ? '' : `_${idx + 1}`;
+                         const suffix = idx === 0 ? '' : `#${idx}`;
                          const fileName = `${item.sku_gtin}${suffix}.png`;
                          
                          const rowId = newRow.number; 

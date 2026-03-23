@@ -442,7 +442,7 @@ export const ExistingProductModification: React.FC<ExistingProductModificationPr
                          // Data columns end at 27 (0-26). Image 1 is 27 (28th column). Actually headers[27] is Image 1.
                          const colIndex = 28 + idx; // 1-based index (27 + 1)
                          
-                         const suffix = idx === 0 ? '' : `_${idx + 1}`;
+                         const suffix = idx === 0 ? '' : `#${idx}`;
                          const fileName = `${item.sku_gtin}${suffix}.png`;
                          
                          const cell = newRow.getCell(colIndex);
@@ -501,7 +501,7 @@ const handleFileChange = (index: number, e: React.ChangeEvent<HTMLInputElement>)
             
             const fileExt = file.name.split('.').pop();
             const sanitizedErp = erpCode.replace(/[^a-zA-Z0-9-_]/g, '');
-            const suffix = i === 0 ? '' : `_${i + 1}`;
+            const suffix = i === 0 ? '' : `#${i}`;
             const fileName = `${sanitizedErp}${suffix}.${fileExt}`;
             const filePath = `${folderName}/${fileName}`;
             
