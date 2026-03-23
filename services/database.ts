@@ -458,9 +458,6 @@ class DatabaseService {
       }
       return data || [];
   }
-}
-
-
 
   // --- Item Master Sync ---
   async syncToItemMaster(products: import('./types').Product[]): Promise<boolean> {
@@ -492,5 +489,7 @@ class DatabaseService {
     }
     return true;
   }
+}
 
 export const db = new DatabaseService();
+
