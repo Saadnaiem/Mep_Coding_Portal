@@ -575,6 +575,12 @@ const App: React.FC = () => {
   useEffect(() => {
     if (selectedRequestId && view === "request_details") {
       setSelectedProductId(null); // Reset detail view when entering a request
+      
+      // FIX: Prevent flash of old data by clearing state before async load
+      setProducts([]);
+      setEditableProducts([]);
+      setActions([]);
+
       const loadDetails = async () => {
         // Fetch fresh request details to ensure Vendor Documents are up-to-date
         const freshRequest = await db.fetchRequestById(selectedRequestId);
