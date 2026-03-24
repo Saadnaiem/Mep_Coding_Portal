@@ -260,6 +260,7 @@ const App: React.FC = () => {
   // Database State
   const [requests, setRequests] = useState<ProductRequest[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [initialProductsState, setInitialProductsState] = useState<Record<string, string>>({});
   const [actions, setActions] = useState<StepAction[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [assignedDivisions, setAssignedDivisions] = useState<string[]>([]);
@@ -534,7 +535,19 @@ const App: React.FC = () => {
   ) => {
     if (selectedProductIds.length === 0) return;
 
-    const updates = selectedProductIds.map((id) =>
+    const filteredProductIds = selectedProductIds.filter((id) => {
+      if (initialProductsState[id] === "rejected" && currentUserEmployee?.role !== "super_admin") {
+        return false;
+      }
+      return true;
+    });
+
+    if (filteredProductIds.length === 0) {
+      alert("No valid products selected. Rejected products cannot be modified without super admin rights.");
+      return;
+    }
+
+    const updates = filteredProductIds.map((id) =>
       db.updateProduct(id, {
         status: status,
         rejection_reason: comment || "",
@@ -545,14 +558,14 @@ const App: React.FC = () => {
 
     // Refresh local state
     const updatedProducts = products.map((p) =>
-      selectedProductIds.includes(p.id)
+      filteredProductIds.includes(p.id)
         ? { ...p, status: status, rejection_reason: comment || "" }
         : p,
     );
     setProducts(updatedProducts);
     setEditableProducts((prev) =>
       prev.map((p) =>
-        selectedProductIds.includes(p.id)
+        filteredProductIds.includes(p.id)
           ? { ...p, status: status, rejection_reason: comment || "" }
           : p
       )
@@ -592,6 +605,12 @@ const App: React.FC = () => {
 
         const p = await db.fetchProducts(selectedRequestId);
         setProducts(p); // Update main products list
+        
+        const initialStatuses: Record<string, string> = {};
+        p.forEach(prod => {
+          initialStatuses[prod.id] = prod.status || "pending";
+        });
+        setInitialProductsState(initialStatuses);
 
         // Initialize editable products
         setEditableProducts(p);
@@ -1088,6 +1107,12 @@ const App: React.FC = () => {
         try {
           for (const p of editableProducts) {
             const { id, ...rest } = p;
+            
+            // SECURITY: Prevent unauthorized status overrides for already rejected items
+            if (initialProductsState[id] === "rejected" && currentUserEmployee?.role !== "super_admin") {
+              delete rest.status;
+            }
+
             await db.updateProduct(id, rest);
           }
         } catch (e) {
@@ -1140,9 +1165,12 @@ const App: React.FC = () => {
 
         // We use Promise.all to ensure updates happen in parallel
         await Promise.all(
-          productsToReset.map((p) =>
-            db.updateProduct(p.id, { status: "pending" }),
-          ),
+          productsToReset.map((p) => {
+            if (initialProductsState[p.id] === "rejected" && currentUserEmployee?.role !== "super_admin") {
+              return Promise.resolve(); // Skip resetting rejected items
+            }
+            return db.updateProduct(p.id, { status: "pending" });
+          }),
         );
       }
     } else if (actionType === "reject") {
@@ -4149,6 +4177,12 @@ const App: React.FC = () => {
               updates.status = "pending";
               updates.rejection_reason = null;
             }
+
+            // SECURITY: Prevent unauthorized status overrides for already rejected items
+            if (initialProductsState[id] === "rejected" && currentUserEmployee?.role !== "super_admin") {
+              delete updates.status;
+            }
+
             await db.updateProduct(id, updates);
           }
         }
@@ -4310,6 +4344,12 @@ const App: React.FC = () => {
           for (const p of editableProducts) {
             const { id, ...rest } = p;
             // Remove calculated fields if any leaked in (though database service handles some)
+            
+            // SECURITY: Prevent unauthorized status overrides for already rejected items
+            if (initialProductsState[id] === "rejected" && currentUserEmployee?.role !== "super_admin") {
+              delete rest.status;
+            }
+
             await db.updateProduct(id, rest);
           }
         }
@@ -5416,11 +5456,14 @@ const App: React.FC = () => {
                                               "pending",
                                               "rejected",
                                             ] as const
-                                          ).map((option) => (
+                                          ).map((option) => {
+                                            const isLockedRejected = initialProductsState[p.id] === "rejected" && currentUserEmployee?.role !== "super_admin";
+                                            return (
                                             <label
                                               key={option}
                                               className={`
-                                                      flex items-center gap-2 px-4 py-3 rounded-xl border-2 cursor-pointer transition-all flex-1 justify-center
+                                                      flex items-center gap-2 px-4 py-3 rounded-xl border-2 transition-all flex-1 justify-center
+                                                      ${isLockedRejected ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
                                                       ${
                                                         p.status === option || (option === "pending" && !p.status)
                                                           ? option ===
@@ -5441,7 +5484,7 @@ const App: React.FC = () => {
                                                 name={`status-${p.id}`}
                                                 checked={p.status === option || (option === "pending" && !p.status)}
                                                 onChange={() => {
-                                                  if (isRequestActionable) {
+                                                  if (isRequestActionable && !isLockedRejected) {
                                                     // Optimistic update
                                                     const updatedProducts = (
                                                       isEditable
@@ -5494,7 +5537,7 @@ const App: React.FC = () => {
                                                         ? "accent-orange-500"
                                                       : "accent-red-600"
                                                 }`}
-                                                disabled={!isRequestActionable}
+                                                disabled={!isRequestActionable || isLockedRejected}
                                               />
                                               <span
                                                 className={`font-bold uppercase text-xs tracking-wider
@@ -5511,7 +5554,7 @@ const App: React.FC = () => {
                                                   : option}
                                               </span>
                                             </label>
-                                          ))}
+                                          );})}
                                         </div>
                                       </div>
 
