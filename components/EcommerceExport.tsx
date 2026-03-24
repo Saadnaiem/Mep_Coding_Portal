@@ -86,20 +86,36 @@ export const EcommerceExport: React.FC = () => {
     
     // Helper to determine waiting status text
     const getWaitingStatus = (p: EcommerceProduct) => {
-        if (p.request_status === 'completed') return <span className="text-green-600 font-bold">Completed</span>;
-        
-        if (p.request_status === 'approved_pending_erp') return <span className="text-purple-600 font-bold">Waiting for ERP Code</span>;
-        
-        if (p.request_status === 'approved_pending_ecommerce' || p.request_status === 'partially_approved') {
-             return <span className="text-emerald-600 font-bold">Approved / Pending Master Sync</span>;
+        // 1. Rejection Absolute Priority
+        if (p.status === 'rejected' || p.request_status === 'rejected') {
+             return <span className="text-red-500 font-bold">Rejected</span>;
         }
 
+        // 2. The Final Approval / Completed check
+        if (p.status === 'approved' || p.request_status === 'completed') {
+             return <span className="text-green-600 font-bold">Completed & Sync to Item Master</span>;
+        }
+
+        // 3. Pending Pipeline Rule (The Middle Steps)
         if (p.request_status === 'in_review' && p.current_step) {
             const step = MOCK_STEPS.find(s => s.step_number === p.current_step);
             const roleName = step?.role_required ? (ROLE_LABELS[step.role_required] || step.role_required) : 'Unknown';
             return (
                 <span className="text-amber-600 font-bold flex items-center gap-1">
                    <Activity size={10} /> Waiting: {roleName}
+                </span>
+            );
+        }
+
+        // 4. Edge Cases: Request sitting in specific queues between steps
+        if (p.request_status === 'approved_pending_erp') {
+            return <span className="text-purple-600 font-bold">Waiting for ERP Code</span>;
+        }
+        
+        if (p.request_status === 'approved_pending_ecommerce' || p.request_status === 'partially_approved') {
+            return (
+                <span className="text-amber-600 font-bold flex items-center gap-1">
+                   <Activity size={10} /> Waiting: E-Commerce Admin
                 </span>
             );
         }
