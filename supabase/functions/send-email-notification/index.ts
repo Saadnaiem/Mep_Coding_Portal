@@ -50,7 +50,7 @@ serve(async (req) => {
             <div style="padding: 24px;">
               <p style="font-size: 16px; margin-top: 0;">Dear <strong>Dr. ${recipient_name}</strong>,</p>
               ${dynamic_data?.is_resubmission 
-                ? `<p>The vendor has submitted corrections for the product onboarding request (<strong>${request_id}</strong>) and it is now ready for your review.</p>`
+                ? `<p>The vendor has submitted corrections for the product listing request (<strong>${request_id}</strong>) and it is now ready for your review.</p>`
                 : `<p>A product listing request (<strong>${request_id}</strong>) requires your attention and is waiting for your review.</p>`
               }
               
@@ -99,7 +99,7 @@ serve(async (req) => {
           <div style="font-family: Arial, sans-serif; color: #0F3D3E; max-width: 600px; margin: 0 auto; padding: 20px;">
             <h2 style="color: #C5A065;">Request Progress Update</h2>
             <p>Dear ${recipient_name},</p>
-            <p>We wanted to let you know that your product listing request (<strong>${request_id}</strong>) has been approved by the <strong>${dynamic_data?.step_passed || 'Reviewer'}</strong>.</p>
+            <p>We would like to inform you that your product listing request (<strong>${request_id}</strong>) has been approved by the <strong>${dynamic_data?.step_passed || 'Reviewer'}</strong>.</p>
             <p>It has now been forwarded to the next step for further review (<strong>${dynamic_data?.next_step || 'the next committee'}</strong>).</p>
             <p>You can check the live status of your request anytime in the portal.</p>
             <a href="${portalUrl}" style="display: inline-block; background-color: #0F3D3E; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin-top: 20px;">Open Portal</a>
@@ -204,7 +204,15 @@ serve(async (req) => {
 
       default:
         subject = "Notification from Alhabib Portal";
-        htmlContent = `<p>You have a new notification. Please check the portal.</p>`;
+        htmlContent = 
+        `<div style="font-family: Arial, sans-serif; color: #0F3D3E; max-width: 600px; margin: 0 auto; padding: 20px;">
+                  <h2 style="color: #C5A065;">Content Update Review Complete</h2>
+                  <p>Dear ${recipient_name},</p>
+                  <p>We would like to inform you that the modification you submitted has been reviewed by the E-Commerce Admin.</p>
+                  <p>Kindly login to the portal and check the status of your request.</p>
+                  <a href="${portalUrl}" style="display: inline-block; background-color: #0F3D3E; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin-top: 20px;">Review Submissions</a>
+                   
+                  <p><strong>Thank you for your cooperation.</strong></p>`;
     }
 
     const FROM_EMAIL = Deno.env.get("RESEND_FROM_EMAIL") || "Acme <onboarding@resend.dev>"; // Replace with your domain if verified
