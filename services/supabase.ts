@@ -22,18 +22,35 @@ export const sendEmailNotification = async (payload: {
   dynamic_data?: any;
 }) => {
   try {
-    const { data, error } = await supabase.functions.invoke('send-email-notification', {
-      body: payload
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData?.session?.access_token || supabaseAnonKey;
+
+    const res = await fetch(`${supabaseUrl}/functions/v1/send-email-notification`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(payload)
     });
-    
-    if (error) {
-      console.error("Error triggering email function:", error);
-      return false;
+
+    const responseText = await res.text();
+
+    if (!res.ok) {
+      console.error(`Edge Function Error (${res.status}):`, responseText);
+      return { success: false, error: `Status ${res.status} - ${responseText}` };
     }
     
-    return true;
-  } catch (err) {
+    let jsonData;
+    try {
+      jsonData = JSON.parse(responseText);
+    } catch(e) {
+      jsonData = responseText;
+    }
+    
+    return { success: true, data: jsonData };
+  } catch (err: any) {
     console.error("Exception triggering email:", err);
-    return false;
+    return { success: false, error: err.message || err };
   }
 };

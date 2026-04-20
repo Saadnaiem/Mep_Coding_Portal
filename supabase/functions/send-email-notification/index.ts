@@ -81,10 +81,6 @@ serve(async (req) => {
                   <tr><td style="padding: 4px 0; color: #4B5563; vertical-align: top;">Brand Names:</td><td style="line-height: 1.4;">${dynamic_data?.brand_names || 'N/A'}</td></tr>
                 </table>
               </div>
-
-              <div style="text-align: center; margin-top: 32px;">
-                <a href="${portalUrl}" style="display: inline-block; background-color: #0F3D3E; color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">Review Request in Portal</a>
-              </div>
             </div>
             <div style="background-color: #F3F4F6; padding: 12px; text-align: center; font-size: 12px; color: #6B7280;">
               This is an automated message from the Alhabib Vendor Portal.
@@ -102,7 +98,6 @@ serve(async (req) => {
             <p>We would like to inform you that your product listing request (<strong>${request_id}</strong>) has been approved by the <strong>${dynamic_data?.step_passed || 'Reviewer'}</strong>.</p>
             <p>It has now been forwarded to the next step for further review (<strong>${dynamic_data?.next_step || 'the next committee'}</strong>).</p>
             <p>You can check the live status of your request anytime in the portal.</p>
-            <a href="${portalUrl}" style="display: inline-block; background-color: #0F3D3E; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin-top: 20px;">Open Portal</a>
           </div>
         `;
         break;
@@ -116,7 +111,6 @@ serve(async (req) => {
             <p>The ${dynamic_data?.approver_title || ''} has requested a revision on your recent product submission (<strong>${request_id}</strong>).</p>
             <p><strong>Note:</strong> ${dynamic_data?.comment || 'Please check the portal for details on what needs to be changed.'}</p>
             <p>Kindly login to the portal, apply the requested changes, and resubmit.</p>
-            <a href="${portalUrl}" style="display: inline-block; background-color: #0F3D3E; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin-top: 20px;">View Revisions</a>
           </div>
         `;
         break;
@@ -130,7 +124,6 @@ serve(async (req) => {
             <p>Unfortunately, some or all items in your product submission (<strong>${request_id}</strong>) have been rejected.</p>
             ${dynamic_data?.comment ? `<p><strong>Reason:</strong> ${dynamic_data.comment}</p>` : ''}
             <p>Please log in to the portal for more details.</p>
-            <a href="${portalUrl}" style="display: inline-block; background-color: #0F3D3E; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin-top: 20px;">Open Portal</a>
           </div>
         `;
         break;
@@ -156,7 +149,6 @@ serve(async (req) => {
             <p>Dear ${recipient_name},</p>
               <p>Our E-commerce team has assigned existing products content modification tasks to your account.</p>
               <p>Please log in to the portal to provide the requested missing information.</p>
-              <a href="${portalUrl}" style="display: inline-block; background-color: #0F3D3E; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin-top: 20px;">View Assigned Tasks</a>
             </div>
           `;
           break;
@@ -169,7 +161,6 @@ serve(async (req) => {
             <p>Dear ${recipient_name},</p>
             <p>The vendor has completed the requested content modifications and submitted them for your review.</p>
             <p>Please launch the E-commerce admin view to accept or decline the changes.</p>
-            <a href="${portalUrl}" style="display: inline-block; background-color: #0F3D3E; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin-top: 20px;">Review Submissions</a>
           </div>
         `;
         break;
@@ -197,7 +188,6 @@ serve(async (req) => {
             <p>A vendor has submitted <strong>${dynamic_data?.total_products || '0'}</strong> product modifications for your review.</p>
             <p><strong>Brands & Items:</strong> ${dynamic_data?.brandDetails || 'N/A'}</p>
             <p>Please log in to the portal to review the items and take the necessary action.</p>
-            <a href="${portalUrl}" style="display: inline-block; background-color: #0F3D3E; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin-top: 20px;">Open Admin Panel</a>
           </div>
         `;
         break;
@@ -210,8 +200,6 @@ serve(async (req) => {
                   <p>Dear ${recipient_name},</p>
                   <p>We would like to inform you that the modification you submitted has been reviewed by the E-Commerce Admin.</p>
                   <p>Kindly login to the portal and check the status of your request.</p>
-                  <a href="${portalUrl}" style="display: inline-block; background-color: #0F3D3E; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin-top: 20px;">Review Submissions</a>
-                   
                   <p><strong>Thank you for your cooperation.</strong></p>`;
     }
 
@@ -236,7 +224,7 @@ serve(async (req) => {
 
     if (!res.ok) {
       console.error("Resend API Error:", data);
-      return new Response(JSON.stringify({ error: "Failed to send email", details: data }), {
+      return new Response(JSON.stringify({ error: "Failed to send email", details: data, debugKey: RESEND_API_KEY ? "EXISTS" : "MISSING", debugEmail: FROM_EMAIL }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500,
       });

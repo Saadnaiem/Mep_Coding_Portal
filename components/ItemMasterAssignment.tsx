@@ -143,13 +143,15 @@ export const ItemMasterAssignment = ({ user, onClose }: { user: any, onClose: ()
     };
 
     const handleAssign = async () => {
-        if (!vendorEmail) {
+        const cleanEmail = vendorEmail.trim().toLowerCase();
+        if (!cleanEmail) {
             alert("Please enter a vendor email.");
             return;
         }
         
         setAssigningLoading(true);
         try {
+            console.log("Starting Assignment for Email:", cleanEmail);
             // 1. Find Vendor by Email
             // We look in 'profiles' first to find user ID, then check if they are a vendor?
             // Actually, simpler to look in 'vendors' table via join or contact_person_id?
@@ -160,12 +162,14 @@ export const ItemMasterAssignment = ({ user, onClose }: { user: any, onClose: ()
             const { data: profiles, error: pError } = await supabase
                 .from('profiles')
                 .select('id, email, full_name')
-                .eq('email', vendorEmail)
+                .ilike('email', cleanEmail)
                 .eq('role', 'vendor')
-                .single();
+                .maybeSingle();
+
+            console.log("Profile Results:", profiles, "Error:", pError);
                 
             if (pError || !profiles) {
-                alert("Vendor not found with this email. Please ensure they are registered.");
+                alert(`Vendor not found for email '${cleanEmail}'. Found: ${JSON.stringify(profiles)} | Error: ${pError?.message || 'No profile row returned (possibly RLS block)'}`);
                 setAssigningLoading(false);
                 return;
             }
@@ -175,10 +179,12 @@ export const ItemMasterAssignment = ({ user, onClose }: { user: any, onClose: ()
                 .from('vendors')
                 .select('id')
                 .eq('contact_person_id', profiles.id)
-                .single();
+                .maybeSingle();
+
+            console.log("Vendor Record Results:", vendorRec, "Error:", vError);
                 
             if (vError || !vendorRec) {
-                 alert("Vendor profile found but no Company record linked. Contact administrator.");
+                 alert(`Vendor profile found but no Company record linked to Profile ID ${profiles.id}.`);
                  setAssigningLoading(false);
                  return;
             }
@@ -186,6 +192,7 @@ export const ItemMasterAssignment = ({ user, onClose }: { user: any, onClose: ()
             // 2. Create Assignment Records in 'existing_product_modifications'
             const selectedItemDetails = items.filter(i => selectedItems.includes(i.erp_item_code));
             
+            console.log("Creating payloads for:", selectedItemDetails.length, "items.");
             const payloads = selectedItemDetails.map(item => ({
                 vendor_id: vendorRec.id,
                 type: 'admin_assigned', // Important Distinct Type
@@ -212,20 +219,30 @@ export const ItemMasterAssignment = ({ user, onClose }: { user: any, onClose: ()
                 .insert(payloads);
 
             if (insertError) {
+                alert("Database Insert Failed: " + insertError.message);
                 throw insertError;
             }
 
+            console.log("Successfully inserted into Database. Triggering email...");
             // Trigger Edge Function Email
-            await sendEmailNotification({
+            const emailResult = await sendEmailNotification({
                 trigger_type: 'CONTENT_ASSIGNED',
-                recipient_email: vendorEmail,
+                recipient_email: cleanEmail,
                 recipient_name: profiles.full_name || 'Vendor',
                 dynamic_data: {
                     assigned_count: payloads.length
                 }
             });
 
-            alert(`Successfully assigned ${payloads.length} items to ${vendorEmail}.\n\nAn email notification has been sent to the vendor containing their new assignment details.`);
+            console.log("Edge Function Response Status:", emailResult);
+
+            if (emailResult.success) {
+                alert(`Successfully assigned ${payloads.length} items to ${cleanEmail}.\n\nAn email notification has been sent to the vendor containing their new assignment details.`);
+            } else {
+                const errMsg = emailResult.error?.message || emailResult.error || 'Unknown Error';
+                alert(`Successfully assigned ${payloads.length} items to ${cleanEmail}, BUT email failed to send in Edge Function.\n\nError: ${errMsg}\n\nPlease check browser console or Supabase logs.`);
+            }
+            
             setIsAssignModalOpen(false);
             setSelectedItems([]);
             setVendorEmail('');
